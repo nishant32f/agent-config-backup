@@ -90,7 +90,7 @@ describe('sync.ts', () => {
         expect(meta).toHaveProperty('platform');
         expect(meta).toHaveProperty('claudeConfigPath');
 
-        expect(meta.version).toBe('2.1.0');
+        expect(meta.version).toBe('2.2.0');
         expect(meta.lastSync).toBeNull();
         expect(meta.claudeConfigPath).toBe(claudeConfigPath);
         expect(meta.codexConfigPath).toBe(codexConfigPath);
@@ -200,6 +200,36 @@ describe('sync.ts', () => {
       expect(statuslineResult).toBeDefined();
     });
 
+    it('should copy Claude plugin metadata while excluding caches and runtime folders', async () => {
+      const claudeDir = path.join(tempDir, '.claude');
+      const jeanClaudeDir = path.join(tempDir, '.agent-config-backup');
+
+      await fs.ensureDir(path.join(claudeDir, 'plugins', 'marketplaces', 'official', '.claude-plugin'));
+      await fs.ensureDir(path.join(claudeDir, 'plugins', 'marketplaces', 'official', '.git'));
+      await fs.ensureDir(path.join(claudeDir, 'plugins', 'marketplaces', 'official', 'node_modules'));
+      await fs.ensureDir(path.join(claudeDir, 'plugins', 'cache', 'official', 'plugin'));
+      await fs.ensureDir(path.join(claudeDir, 'plugins', 'data', 'plugin-state'));
+      await fs.ensureDir(jeanClaudeDir);
+
+      await fs.writeFile(path.join(claudeDir, 'plugins', 'installed_plugins.json'), '{"plugins":{}}');
+      await fs.writeFile(path.join(claudeDir, 'plugins', 'known_marketplaces.json'), '{"official":{}}');
+      await fs.writeFile(path.join(claudeDir, 'plugins', 'marketplaces', 'official', '.claude-plugin', 'plugin.json'), '{}');
+      await fs.writeFile(path.join(claudeDir, 'plugins', 'marketplaces', 'official', '.git', 'config'), 'git');
+      await fs.writeFile(path.join(claudeDir, 'plugins', 'marketplaces', 'official', 'node_modules', 'dep.js'), 'dep');
+      await fs.writeFile(path.join(claudeDir, 'plugins', 'cache', 'official', 'plugin', 'runtime.js'), 'runtime');
+      await fs.writeFile(path.join(claudeDir, 'plugins', 'data', 'plugin-state', 'state.json'), '{}');
+
+      await syncFromClaudeConfig(claudeDir, jeanClaudeDir);
+
+      expect(await fs.pathExists(path.join(jeanClaudeDir, 'plugins', 'installed_plugins.json'))).toBe(true);
+      expect(await fs.pathExists(path.join(jeanClaudeDir, 'plugins', 'known_marketplaces.json'))).toBe(true);
+      expect(await fs.pathExists(path.join(jeanClaudeDir, 'plugins', 'marketplaces', 'official', '.claude-plugin', 'plugin.json'))).toBe(true);
+      expect(await fs.pathExists(path.join(jeanClaudeDir, 'plugins', 'marketplaces', 'official', '.git', 'config'))).toBe(false);
+      expect(await fs.pathExists(path.join(jeanClaudeDir, 'plugins', 'marketplaces', 'official', 'node_modules', 'dep.js'))).toBe(false);
+      expect(await fs.pathExists(path.join(jeanClaudeDir, 'plugins', 'cache', 'official', 'plugin', 'runtime.js'))).toBe(false);
+      expect(await fs.pathExists(path.join(jeanClaudeDir, 'plugins', 'data', 'plugin-state', 'state.json'))).toBe(false);
+    });
+
     it('should sync hooks directory', async () => {
       const claudeDir = path.join(tempDir, '.claude');
       const jeanClaudeDir = path.join(tempDir, '.agent-config-backup');
@@ -269,6 +299,27 @@ describe('sync.ts', () => {
       const claudeMd = await fs.readFile(path.join(claudeDir, 'CLAUDE.md'), 'utf-8');
       expect(claudeMd).toBe('# New');
     });
+
+    it('should apply Claude plugin backup without deleting local plugin cache', async () => {
+      const claudeDir = path.join(tempDir, '.claude');
+      const jeanClaudeDir = path.join(tempDir, '.agent-config-backup');
+
+      await fs.ensureDir(path.join(claudeDir, 'plugins', 'cache', 'local-plugin'));
+      await fs.ensureDir(path.join(jeanClaudeDir, 'plugins', 'marketplaces', 'official', '.claude-plugin'));
+      await fs.ensureDir(path.join(jeanClaudeDir, 'plugins', 'cache', 'should-not-copy'));
+
+      await fs.writeFile(path.join(claudeDir, 'plugins', 'cache', 'local-plugin', 'runtime.js'), 'keep');
+      await fs.writeFile(path.join(jeanClaudeDir, 'plugins', 'installed_plugins.json'), '{"plugins":{}}');
+      await fs.writeFile(path.join(jeanClaudeDir, 'plugins', 'marketplaces', 'official', '.claude-plugin', 'plugin.json'), '{}');
+      await fs.writeFile(path.join(jeanClaudeDir, 'plugins', 'cache', 'should-not-copy', 'runtime.js'), 'skip');
+
+      await syncToClaudeConfig(jeanClaudeDir, claudeDir);
+
+      expect(await fs.pathExists(path.join(claudeDir, 'plugins', 'installed_plugins.json'))).toBe(true);
+      expect(await fs.pathExists(path.join(claudeDir, 'plugins', 'marketplaces', 'official', '.claude-plugin', 'plugin.json'))).toBe(true);
+      expect(await fs.readFile(path.join(claudeDir, 'plugins', 'cache', 'local-plugin', 'runtime.js'), 'utf-8')).toBe('keep');
+      expect(await fs.pathExists(path.join(claudeDir, 'plugins', 'cache', 'should-not-copy', 'runtime.js'))).toBe(false);
+    });
   });
 
   describe('Codex sync support', () => {
@@ -299,6 +350,37 @@ describe('sync.ts', () => {
       expect(await fs.pathExists(path.join(syncDir, 'codex', 'skills', 'example', 'SKILL.md'))).toBe(true);
       expect(await fs.pathExists(path.join(syncDir, 'codex', 'rules', 'default.rules'))).toBe(true);
       expect(await fs.pathExists(path.join(syncDir, 'codex', 'auth.json'))).toBe(false);
+    });
+
+    it('should copy Codex plugin manifests while excluding plugin caches and staging', async () => {
+      const claudeDir = path.join(tempDir, '.claude');
+      const codexDir = path.join(tempDir, '.codex');
+      const syncDir = path.join(tempDir, '.agent-config-backup');
+
+      await fs.ensureDir(claudeDir);
+      await fs.ensureDir(path.join(codexDir, 'plugins', 'local-plugin'));
+      await fs.ensureDir(path.join(codexDir, 'plugins', 'cache', 'runtime-plugin'));
+      await fs.ensureDir(path.join(codexDir, 'plugins', '.remote-plugin-install-staging', 'tmp'));
+      await fs.ensureDir(path.join(codexDir, 'compound-engineering'));
+      await fs.ensureDir(path.join(codexDir, 'computer-use'));
+      await fs.ensureDir(syncDir);
+
+      await fs.writeFile(path.join(codexDir, 'plugins', 'local-plugin', 'plugin.json'), '{}');
+      await fs.writeFile(path.join(codexDir, 'plugins', 'cache', 'runtime-plugin', 'SKILL.md'), '# cache');
+      await fs.writeFile(path.join(codexDir, 'plugins', '.remote-plugin-install-staging', 'tmp', 'plugin.json'), '{}');
+      await fs.writeFile(path.join(codexDir, 'compound-engineering', 'install-manifest.json'), '{"pluginName":"compound-engineering"}');
+      await fs.writeFile(path.join(codexDir, 'computer-use', 'config.json'), '{"locale":"en-GB"}');
+
+      await syncAllFromConfigs(
+        syncDir,
+        createSyncTargets(claudeDir, codexDir)
+      );
+
+      expect(await fs.pathExists(path.join(syncDir, 'codex', 'plugins', 'local-plugin', 'plugin.json'))).toBe(true);
+      expect(await fs.pathExists(path.join(syncDir, 'codex', 'plugins', 'cache', 'runtime-plugin', 'SKILL.md'))).toBe(false);
+      expect(await fs.pathExists(path.join(syncDir, 'codex', 'plugins', '.remote-plugin-install-staging', 'tmp', 'plugin.json'))).toBe(false);
+      expect(await fs.pathExists(path.join(syncDir, 'codex', 'compound-engineering', 'install-manifest.json'))).toBe(true);
+      expect(await fs.pathExists(path.join(syncDir, 'codex', 'computer-use', 'config.json'))).toBe(true);
     });
 
     it('should apply codex/ files back to ~/.codex', async () => {

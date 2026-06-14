@@ -34,6 +34,7 @@ Claude Code files are stored at the root of the sync repository:
 - `agents/`
 - `keybindings.json`
 - `statusline.sh`
+- `plugins/` metadata and marketplace/source files, excluding caches, data, Git internals, and `node_modules`
 - Profile definitions
 
 Codex files are stored under `codex/` in the sync repository:
@@ -44,8 +45,11 @@ Codex files are stored under `codex/` in the sync repository:
 - `codex/agents/` from `~/.codex/agents/`
 - `codex/skills/` from `~/.codex/skills/`
 - `codex/rules/` from `~/.codex/rules/`
+- `codex/plugins/` from `~/.codex/plugins/`, excluding cache/staging/runtime files
+- `codex/compound-engineering/` from `~/.codex/compound-engineering/`
+- `codex/computer-use/config.json` from `~/.codex/computer-use/config.json`
 
-Codex auth, sessions, logs, caches, databases, attachments, browser state, worktrees, and history are intentionally not synced.
+Codex auth, sessions, logs, caches, databases, attachments, browser state, worktrees, staging directories, and history are intentionally not synced.
 
 ## Profiles
 
@@ -147,4 +151,6 @@ npm run test:integration
 
 ## Security Notes
 
-Codex support is intentionally config-focused. It does not back up `~/.codex/auth.json`, session logs, SQLite state, browser sessions, attachments, plugin caches, temporary files, or worktrees.
+Codex support is intentionally config-focused. It does not back up `~/.codex/auth.json`, session logs, SQLite state, browser sessions, attachments, plugin caches, temporary files, staging directories, or worktrees.
+
+Claude plugin sync is similarly conservative: plugin manifests, marketplace metadata, and source files are backed up, but `~/.claude/plugins/cache/`, `~/.claude/plugins/data/`, `.git/`, and `node_modules/` are excluded.

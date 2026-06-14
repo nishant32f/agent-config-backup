@@ -5,6 +5,18 @@ import os from 'os';
 import type { FileMapping, SyncResult, MetaJson } from '../types/index.js';
 import { getConfigPaths } from './paths.js';
 
+const PLUGIN_DIRECTORY_EXCLUDES = [
+  'cache/**',
+  'data/**',
+  '.remote-plugin-install-staging/**',
+  'marketplaces/temp_*/**',
+  '**/.git/**',
+  '**/node_modules/**',
+  '**/.DS_Store',
+  '.last_inuse_sweep',
+  'plugin-catalog-cache.json',
+];
+
 export const CLAUDE_FILE_MAPPINGS: FileMapping[] = [
   {
     source: 'CLAUDE.md',
@@ -41,6 +53,12 @@ export const CLAUDE_FILE_MAPPINGS: FileMapping[] = [
     target: 'statusline.sh',
     type: 'file',
   },
+  {
+    source: 'plugins',
+    target: 'plugins',
+    type: 'directory',
+    exclude: PLUGIN_DIRECTORY_EXCLUDES,
+  },
 ];
 
 export const CODEX_FILE_MAPPINGS: FileMapping[] = [
@@ -73,6 +91,27 @@ export const CODEX_FILE_MAPPINGS: FileMapping[] = [
     source: 'codex/rules',
     target: 'rules',
     type: 'directory',
+  },
+  {
+    source: 'codex/plugins',
+    target: 'plugins',
+    type: 'directory',
+    exclude: PLUGIN_DIRECTORY_EXCLUDES,
+  },
+  {
+    source: 'codex/compound-engineering',
+    target: 'compound-engineering',
+    type: 'directory',
+    exclude: [
+      '**/.git/**',
+      '**/node_modules/**',
+      '**/.DS_Store',
+    ],
+  },
+  {
+    source: 'codex/computer-use/config.json',
+    target: 'computer-use/config.json',
+    type: 'file',
   },
 ];
 
@@ -167,17 +206,80 @@ export function compareAllFiles(
   );
 }
 
-async function listFilesRecursive(dir: string, base: string = ''): Promise<string[]> {
+function wildcardToRegExp(pattern: string): RegExp {
+  const doubleStar = '\u0000';
+  const singleStar = '\u0001';
+  const escaped = pattern
+    .replace(/\*\*/g, doubleStar)
+    .replace(/\*/g, singleStar)
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replaceAll(doubleStar, '.*')
+    .replaceAll(singleStar, '[^/]*');
+  return new RegExp(`^${escaped}$`);
+}
+
+function isExcluded(relativePath: string, exclude: string[] = []): boolean {
+  const normalized = relativePath.replace(/\\/g, '/');
+
+  return exclude.some((pattern) => {
+    const normalizedPattern = pattern.replace(/\\/g, '/');
+
+    if (normalizedPattern.endsWith('/**')) {
+      const prefix = normalizedPattern.slice(0, -3);
+      if (normalized === prefix || normalized.startsWith(`${prefix}/`)) {
+        return true;
+      }
+    }
+
+    if (normalizedPattern.startsWith('**/')) {
+      const suffix = normalizedPattern.slice(3);
+      if (normalized === suffix || normalized.endsWith(`/${suffix}`)) {
+        return true;
+      }
+    }
+
+    return wildcardToRegExp(normalizedPattern).test(normalized);
+  });
+}
+
+async function listFilesRecursive(
+  dir: string,
+  base: string = '',
+  exclude: string[] = []
+): Promise<string[]> {
   const files: string[] = [];
   const entries = await fs.readdir(dir, { withFileTypes: true });
   for (const entry of entries) {
     const relativePath = base ? `${base}/${entry.name}` : entry.name;
+    if (isExcluded(relativePath, exclude)) {
+      continue;
+    }
     if (entry.isDirectory()) {
-      files.push(...await listFilesRecursive(path.join(dir, entry.name), relativePath));
+      files.push(...await listFilesRecursive(path.join(dir, entry.name), relativePath, exclude));
     } else {
       files.push(relativePath);
     }
   }
+  return files;
+}
+
+async function copyDirectoryFiltered(
+  sourcePath: string,
+  targetPath: string,
+  exclude: string[] = [],
+  clearTarget = false
+): Promise<string[]> {
+  const files = await listFilesRecursive(sourcePath, '', exclude);
+
+  if (clearTarget) {
+    await fs.remove(targetPath);
+  }
+  await fs.ensureDir(targetPath);
+
+  for (const file of files) {
+    await fs.copy(path.join(sourcePath, file), path.join(targetPath, file), { overwrite: true });
+  }
+
   return files;
 }
 
@@ -218,9 +320,13 @@ export async function syncToConfig(
 
     if (mapping.type === 'directory') {
       // List individual files in directory
-      const files = await listFilesRecursive(sourcePath);
+      const files = await listFilesRecursive(sourcePath, '', mapping.exclude);
       if (!dryRun) {
-        await fs.copy(sourcePath, targetPath, { overwrite: true });
+        if (mapping.exclude?.length) {
+          await copyDirectoryFiltered(sourcePath, targetPath, mapping.exclude);
+        } else {
+          await fs.copy(sourcePath, targetPath, { overwrite: true });
+        }
       }
       for (const file of files) {
         const fileTargetPath = path.join(targetPath, file);
@@ -286,7 +392,11 @@ export async function importFromClaudeConfig(
     const targetExists = fs.existsSync(targetPath);
 
     if (mapping.type === 'directory') {
-      await fs.copy(sourcePath, targetPath, { overwrite: true });
+      if (mapping.exclude?.length) {
+        await copyDirectoryFiltered(sourcePath, targetPath, mapping.exclude, true);
+      } else {
+        await fs.copy(sourcePath, targetPath, { overwrite: true });
+      }
     } else {
       await fs.copy(sourcePath, targetPath);
     }
@@ -348,7 +458,11 @@ export async function syncFromConfig(
       if (targetExists) {
         await fs.remove(targetPath);
       }
-      await fs.copy(sourcePath, targetPath);
+      if (mapping.exclude?.length) {
+        await copyDirectoryFiltered(sourcePath, targetPath, mapping.exclude);
+      } else {
+        await fs.copy(sourcePath, targetPath);
+      }
     } else {
       await fs.copy(sourcePath, targetPath);
     }
@@ -407,7 +521,7 @@ export function createMetaJson(
     .slice(0, 8);
 
   return {
-    version: '2.1.0',
+    version: '2.2.0',
     managedBy: 'agent-config-backup',
     lastSync: null,
     machineId: `${hostname}-${machineId}`,

@@ -33,6 +33,7 @@ export interface FileMapping {
   source: string;
   target: string;
   type: 'file' | 'directory';
+  exclude?: string[];
 }
 
 export interface MetaJson {

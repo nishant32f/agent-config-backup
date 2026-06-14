@@ -1,6 +1,6 @@
 {
   "name": "agent-config-backup",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Sync Claude Code and Codex configuration across machines using Git",
   "author": "nishant32f",
   "repository": {
