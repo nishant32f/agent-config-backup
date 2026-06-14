@@ -5,7 +5,7 @@ import os from 'os';
 import type { FileMapping, SyncResult, MetaJson } from '../types/index.js';
 import { getConfigPaths } from './paths.js';
 
-export const FILE_MAPPINGS: FileMapping[] = [
+export const CLAUDE_FILE_MAPPINGS: FileMapping[] = [
   {
     source: 'CLAUDE.md',
     target: 'CLAUDE.md',
@@ -43,6 +43,67 @@ export const FILE_MAPPINGS: FileMapping[] = [
   },
 ];
 
+export const CODEX_FILE_MAPPINGS: FileMapping[] = [
+  {
+    source: 'codex/AGENTS.md',
+    target: 'AGENTS.md',
+    type: 'file',
+  },
+  {
+    source: 'codex/config.toml',
+    target: 'config.toml',
+    type: 'file',
+  },
+  {
+    source: 'codex/hooks.json',
+    target: 'hooks.json',
+    type: 'file',
+  },
+  {
+    source: 'codex/agents',
+    target: 'agents',
+    type: 'directory',
+  },
+  {
+    source: 'codex/skills',
+    target: 'skills',
+    type: 'directory',
+  },
+  {
+    source: 'codex/rules',
+    target: 'rules',
+    type: 'directory',
+  },
+];
+
+export const FILE_MAPPINGS: FileMapping[] = CLAUDE_FILE_MAPPINGS;
+
+export interface SyncTarget {
+  name: 'Claude' | 'Codex';
+  configDir: string;
+  mappings: FileMapping[];
+  optional?: boolean;
+}
+
+export function createSyncTargets(
+  claudeConfigDir: string,
+  codexConfigDir: string
+): SyncTarget[] {
+  return [
+    {
+      name: 'Claude',
+      configDir: claudeConfigDir,
+      mappings: CLAUDE_FILE_MAPPINGS,
+    },
+    {
+      name: 'Codex',
+      configDir: codexConfigDir,
+      mappings: CODEX_FILE_MAPPINGS,
+      optional: true,
+    },
+  ];
+}
+
 function fileHash(filePath: string): string | null {
   if (!fs.existsSync(filePath)) {
     return null;
@@ -53,9 +114,10 @@ function fileHash(filePath: string): string | null {
 
 export function compareFiles(
   sourceDir: string,
-  targetDir: string
+  targetDir: string,
+  mappings: FileMapping[] = FILE_MAPPINGS
 ): Array<{ mapping: FileMapping; inSync: boolean; sourceExists: boolean; targetExists: boolean }> {
-  return FILE_MAPPINGS.map((mapping) => {
+  return mappings.map((mapping) => {
     const sourcePath = path.join(sourceDir, mapping.source);
     const targetPath = path.join(targetDir, mapping.target);
 
@@ -87,6 +149,24 @@ export function compareFiles(
   });
 }
 
+export function compareAllFiles(
+  jeanClaudeDir: string,
+  targets: SyncTarget[]
+): Array<{
+  targetName: string;
+  mapping: FileMapping;
+  inSync: boolean;
+  sourceExists: boolean;
+  targetExists: boolean;
+}> {
+  return targets.flatMap((target) =>
+    compareFiles(jeanClaudeDir, target.configDir, target.mappings).map((result) => ({
+      targetName: target.name,
+      ...result,
+    }))
+  );
+}
+
 async function listFilesRecursive(dir: string, base: string = ''): Promise<string[]> {
   const files: string[] = [];
   const entries = await fs.readdir(dir, { withFileTypes: true });
@@ -106,16 +186,25 @@ export async function syncToClaudeConfig(
   claudeConfigDir: string,
   dryRun = false
 ): Promise<SyncResult[]> {
+  return syncToConfig(jeanClaudeDir, claudeConfigDir, CLAUDE_FILE_MAPPINGS, dryRun);
+}
+
+export async function syncToConfig(
+  jeanClaudeDir: string,
+  configDir: string,
+  mappings: FileMapping[],
+  dryRun = false
+): Promise<SyncResult[]> {
   const results: SyncResult[] = [];
 
   // Ensure target directory exists
   if (!dryRun) {
-    await fs.ensureDir(claudeConfigDir);
+    await fs.ensureDir(configDir);
   }
 
-  for (const mapping of FILE_MAPPINGS) {
+  for (const mapping of mappings) {
     const sourcePath = path.join(jeanClaudeDir, mapping.source);
-    const targetPath = path.join(claudeConfigDir, mapping.target);
+    const targetPath = path.join(configDir, mapping.target);
 
     if (!fs.existsSync(sourcePath)) {
       results.push({
@@ -160,6 +249,26 @@ export async function syncToClaudeConfig(
   return results;
 }
 
+export async function syncAllToConfigs(
+  jeanClaudeDir: string,
+  targets: SyncTarget[],
+  dryRun = false
+): Promise<SyncResult[]> {
+  const allResults: SyncResult[] = [];
+
+  for (const target of targets) {
+    const targetResults = await syncToConfig(
+      jeanClaudeDir,
+      target.configDir,
+      target.mappings,
+      dryRun
+    );
+    allResults.push(...targetResults);
+  }
+
+  return allResults;
+}
+
 export async function importFromClaudeConfig(
   claudeConfigDir: string,
   jeanClaudeDir: string
@@ -197,10 +306,18 @@ export async function syncFromClaudeConfig(
   claudeConfigDir: string,
   jeanClaudeDir: string
 ): Promise<SyncResult[]> {
+  return syncFromConfig(claudeConfigDir, jeanClaudeDir, CLAUDE_FILE_MAPPINGS);
+}
+
+export async function syncFromConfig(
+  configDir: string,
+  jeanClaudeDir: string,
+  mappings: FileMapping[]
+): Promise<SyncResult[]> {
   const results: SyncResult[] = [];
 
-  for (const mapping of FILE_MAPPINGS) {
-    const sourcePath = path.join(claudeConfigDir, mapping.target);
+  for (const mapping of mappings) {
+    const sourcePath = path.join(configDir, mapping.target);
     const targetPath = path.join(jeanClaudeDir, mapping.source);
 
     if (!fs.existsSync(sourcePath)) {
@@ -247,7 +364,40 @@ export async function syncFromClaudeConfig(
   return results;
 }
 
-export function createMetaJson(claudeConfigPath: string): MetaJson {
+export async function syncAllFromConfigs(
+  jeanClaudeDir: string,
+  targets: SyncTarget[]
+): Promise<SyncResult[]> {
+  const allResults: SyncResult[] = [];
+
+  for (const target of targets) {
+    if (target.optional && !fs.existsSync(target.configDir)) {
+      for (const mapping of target.mappings) {
+        allResults.push({
+          file: mapping.source,
+          action: 'skipped',
+          source: path.join(target.configDir, mapping.target),
+          target: path.join(jeanClaudeDir, mapping.source),
+        });
+      }
+      continue;
+    }
+
+    const targetResults = await syncFromConfig(
+      target.configDir,
+      jeanClaudeDir,
+      target.mappings
+    );
+    allResults.push(...targetResults);
+  }
+
+  return allResults;
+}
+
+export function createMetaJson(
+  claudeConfigPath: string,
+  codexConfigPath?: string
+): MetaJson {
   const { platform } = getConfigPaths();
   const hostname = os.hostname();
   const machineId = crypto
@@ -257,12 +407,13 @@ export function createMetaJson(claudeConfigPath: string): MetaJson {
     .slice(0, 8);
 
   return {
-    version: '1.1.0',
-    managedBy: 'jean-claude',
+    version: '2.1.0',
+    managedBy: 'agent-config-backup',
     lastSync: null,
     machineId: `${hostname}-${machineId}`,
     platform,
     claudeConfigPath,
+    codexConfigPath,
   };
 }
 

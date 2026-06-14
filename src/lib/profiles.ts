@@ -60,7 +60,7 @@ export async function createProfile(
     throw new JeanClaudeError(
       `Profile "${name}" already exists`,
       ErrorCode.ALREADY_EXISTS,
-      `Use 'jean-claude profile list' to see existing profiles.`
+      `Use 'agent-config profile list' to see existing profiles.`
     );
   }
 
@@ -152,7 +152,7 @@ export async function refreshSymlinks(name: string): Promise<string[]> {
     throw new JeanClaudeError(
       `Profile "${name}" not found`,
       ErrorCode.NOT_INITIALIZED,
-      `Use 'jean-claude profile list' to see existing profiles.`
+      `Use 'agent-config profile list' to see existing profiles.`
     );
   }
 
@@ -168,7 +168,7 @@ export async function deleteProfile(name: string): Promise<Profile> {
     throw new JeanClaudeError(
       `Profile "${name}" not found`,
       ErrorCode.NOT_INITIALIZED,
-      `Use 'jean-claude profile list' to see existing profiles.`
+      `Use 'agent-config profile list' to see existing profiles.`
     );
   }
 
@@ -189,7 +189,7 @@ export function getShellAliasLine(profile: Profile): string {
 }
 
 export function getShellAliasBlock(name: string, profile: Profile): string {
-  return `\n# jean-claude profile: ${name}\n${getShellAliasLine(profile)}\n`;
+  return `\n# agent-config profile: ${name}\n${getShellAliasLine(profile)}\n`;
 }
 
 function escapeRegExp(str: string): string {
@@ -198,8 +198,15 @@ function escapeRegExp(str: string): string {
 
 function profileAliasRegex(name: string): RegExp {
   return new RegExp(
-    `\\n# jean-claude profile: ${escapeRegExp(name)}\\n[^\\n]+\\n`,
+    `\\n# (?:agent-config|jean-claude) profile: ${escapeRegExp(name)}\\n[^\\n]+\\n`,
     'g'
+  );
+}
+
+function hasProfileAliasBlock(content: string, name: string): boolean {
+  return (
+    content.includes(`agent-config profile: ${name}`) ||
+    content.includes(`jean-claude profile: ${name}`)
   );
 }
 
@@ -214,7 +221,7 @@ export async function installShellAlias(
   // Check if alias already exists
   if (await fs.pathExists(rcPath)) {
     const content = await fs.readFile(rcPath, 'utf-8');
-    if (content.includes(`jean-claude profile: ${name}`)) {
+    if (hasProfileAliasBlock(content, name)) {
       const updated = content.replace(profileAliasRegex(name), block);
       await fs.writeFile(rcPath, updated);
       return;
@@ -236,7 +243,7 @@ export async function removeShellAlias(
   }
 
   const content = await fs.readFile(rcPath, 'utf-8');
-  if (!content.includes(`jean-claude profile: ${name}`)) {
+  if (!hasProfileAliasBlock(content, name)) {
     return false;
   }
 

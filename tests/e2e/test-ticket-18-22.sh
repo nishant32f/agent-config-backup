@@ -190,12 +190,12 @@ setup() {
 
     # Build jean-claude
     cd "$(dirname "$0")/../.."
-    print_info "Building jean-claude..."
+    print_info "Building agent-config..."
     npm run build > /dev/null 2>&1
 
     JEAN_CLAUDE_BIN="$(pwd)/dist/index.js"
     if [ ! -f "$JEAN_CLAUDE_BIN" ]; then
-        echo -e "${RED}Error: jean-claude binary not found at $JEAN_CLAUDE_BIN${NC}"
+        echo -e "${RED}Error: agent-config binary not found at $JEAN_CLAUDE_BIN${NC}"
         exit 1
     fi
     print_info "Binary: $JEAN_CLAUDE_BIN"
@@ -216,7 +216,7 @@ test_ticket_18_pull_warns_uncommitted_changes() {
     # 2. Init m1
     print_test "#18 - Init machine 1"
     run_jean_claude "$TICKET_M1" init --sync --url "$TICKET_REMOTE" > /dev/null 2>&1
-    assert_dir_exists "$TICKET_M1/.claude/.jean-claude"
+    assert_dir_exists "$TICKET_M1/.agent-config-backup"
 
     # 3. Create content on m1
     echo "# Config from machine 1" > "$TICKET_M1/.claude/CLAUDE.md"
@@ -224,12 +224,12 @@ test_ticket_18_pull_warns_uncommitted_changes() {
     # 4. Push from m1
     print_test "#18 - Push from machine 1"
     run_jean_claude "$TICKET_M1" sync push > /dev/null 2>&1
-    assert_file_exists "$TICKET_M1/.claude/.jean-claude/CLAUDE.md"
+    assert_file_exists "$TICKET_M1/.agent-config-backup/CLAUDE.md"
 
     # 5. Init m2
     print_test "#18 - Init machine 2"
     run_jean_claude "$TICKET_M2" init --sync --url "$TICKET_REMOTE" > /dev/null 2>&1
-    assert_dir_exists "$TICKET_M2/.claude/.jean-claude"
+    assert_dir_exists "$TICKET_M2/.agent-config-backup"
 
     # 6. Pull on m2 to get m1's content
     print_test "#18 - Pull on machine 2 (initial, with --force)"
@@ -237,8 +237,8 @@ test_ticket_18_pull_warns_uncommitted_changes() {
     assert_file_exists "$TICKET_M2/.claude/CLAUDE.md"
     assert_file_contains "$TICKET_M2/.claude/CLAUDE.md" "Config from machine 1"
 
-    # 7. Make an uncommitted local edit inside m2's .jean-claude repo
-    echo "local edit that should be preserved" > "$TICKET_M2/.claude/.jean-claude/CLAUDE.md"
+    # 7. Make an uncommitted local edit inside m2's .agent-config-backup repo
+    echo "local edit that should be preserved" > "$TICKET_M2/.agent-config-backup/CLAUDE.md"
 
     # 8. Test cancellation - pipe "n" to decline the confirmation prompt
     print_test "#18 - Pull with uncommitted changes warns and cancellation preserves them"
@@ -251,7 +251,7 @@ test_ticket_18_pull_warns_uncommitted_changes() {
         # In non-TTY environments inquirer may not display the prompt, so we
         # check whether the pull at least did NOT silently overwrite the file.
         print_info "Prompt text not detected (possible non-TTY); checking file preservation instead"
-        if grep -q "local edit" "$TICKET_M2/.claude/.jean-claude/CLAUDE.md" 2>/dev/null; then
+        if grep -q "local edit" "$TICKET_M2/.agent-config-backup/CLAUDE.md" 2>/dev/null; then
             print_success "Local edit preserved (pull did not silently discard)"
         else
             print_failure "Local edit was silently discarded without warning"
@@ -259,14 +259,14 @@ test_ticket_18_pull_warns_uncommitted_changes() {
     fi
 
     # Verify the local edit is still there after cancellation
-    assert_file_contains "$TICKET_M2/.claude/.jean-claude/CLAUDE.md" "local edit"
+    assert_file_contains "$TICKET_M2/.agent-config-backup/CLAUDE.md" "local edit"
 
     # 10. Test --force: should discard local changes and pull
     print_test "#18 - Pull with --force discards uncommitted changes"
     run_jean_claude "$TICKET_M2" sync pull --force > /dev/null 2>&1
 
     # 11. Assert: local edit is gone, original content is restored
-    assert_file_not_contains "$TICKET_M2/.claude/.jean-claude/CLAUDE.md" "local edit"
+    assert_file_not_contains "$TICKET_M2/.agent-config-backup/CLAUDE.md" "local edit"
     assert_file_contains "$TICKET_M2/.claude/CLAUDE.md" "Config from machine 1"
 }
 
@@ -291,19 +291,19 @@ test_ticket_22_push_auto_rebases_on_divergence() {
     # 2. Init m1
     print_test "#22 - Init machine 1"
     run_jean_claude "$TICKET_M1" init --sync --url "$TICKET_REMOTE" > /dev/null 2>&1
-    assert_dir_exists "$TICKET_M1/.claude/.jean-claude"
+    assert_dir_exists "$TICKET_M1/.agent-config-backup"
 
     # 3. Init m2
     print_test "#22 - Init machine 2"
     run_jean_claude "$TICKET_M2" init --sync --url "$TICKET_REMOTE" > /dev/null 2>&1
-    assert_dir_exists "$TICKET_M2/.claude/.jean-claude"
+    assert_dir_exists "$TICKET_M2/.agent-config-backup"
 
     # 4. m1 creates and pushes a file
     print_test "#22 - Machine 1 pushes a skill file"
     mkdir -p "$TICKET_M1/.claude/skills"
     echo "skill from m1" > "$TICKET_M1/.claude/skills/m1-skill.md"
     run_jean_claude "$TICKET_M1" sync push > /dev/null 2>&1
-    assert_file_exists "$TICKET_M1/.claude/.jean-claude/skills/m1-skill.md"
+    assert_file_exists "$TICKET_M1/.agent-config-backup/skills/m1-skill.md"
 
     # 5. m2 creates a DIFFERENT file and pushes WITHOUT pulling m1's change first
     #    This will cause divergent history. meta.json will conflict (different

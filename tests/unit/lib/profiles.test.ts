@@ -29,7 +29,7 @@ describe('profiles.ts', () => {
   beforeEach(async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'jean-claude-test-'));
     claudeConfigDir = path.join(tempDir, '.claude');
-    jeanClaudeDir = path.join(tempDir, '.jean-claude');
+    jeanClaudeDir = path.join(tempDir, '.agent-config-backup');
 
     await fs.ensureDir(claudeConfigDir);
     await fs.ensureDir(jeanClaudeDir);
@@ -40,6 +40,7 @@ describe('profiles.ts', () => {
     // Set up mocks
     vi.mocked(getConfigPaths).mockReturnValue({
       claudeConfigDir,
+      codexConfigDir: path.join(tempDir, '.codex'),
       jeanClaudeDir,
       platform: 'darwin',
     });
@@ -223,7 +224,7 @@ describe('profiles.ts', () => {
       // Install the alias
       await installShellAlias('my-work', profile, '.zshrc');
       const content1 = await fs.readFile(rcPath, 'utf-8');
-      expect(content1).toContain('jean-claude profile: my-work');
+      expect(content1).toContain('agent-config profile: my-work');
       expect(content1).toContain('claude-my-work');
 
       // Re-install (should replace, not duplicate)
@@ -232,7 +233,7 @@ describe('profiles.ts', () => {
       const content2 = await fs.readFile(rcPath, 'utf-8');
 
       // Should only have one alias block
-      const matches = content2.match(/jean-claude profile: my-work/g);
+      const matches = content2.match(/agent-config profile: my-work/g);
       expect(matches?.length).toBe(1);
       expect(content2).toContain('/updated/path');
     });
@@ -250,8 +251,24 @@ describe('profiles.ts', () => {
       expect(removed).toBe(true);
 
       const content = await fs.readFile(rcPath, 'utf-8');
-      expect(content).not.toContain('jean-claude profile: a\n');
-      expect(content).toContain('jean-claude profile: ab');
+      expect(content).not.toContain('agent-config profile: a\n');
+      expect(content).toContain('agent-config profile: ab');
+    });
+
+    it('should replace legacy jean-claude alias blocks', async () => {
+      const rcPath = path.join(tempDir, '.zshrc');
+      await fs.writeFile(
+        rcPath,
+        '\n# jean-claude profile: legacy\nalias claude-legacy=\'CLAUDE_CONFIG_DIR="/old" claude\'\n'
+      );
+
+      const profile = { alias: 'claude-legacy', configDir: path.join(tempDir, '.claude-legacy') };
+      await installShellAlias('legacy', profile, '.zshrc');
+
+      const content = await fs.readFile(rcPath, 'utf-8');
+      expect(content).toContain('agent-config profile: legacy');
+      expect(content).not.toContain('jean-claude profile: legacy');
+      expect(content).toContain(profile.configDir);
     });
   });
 

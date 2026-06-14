@@ -12,12 +12,12 @@ export function detectPlatform(): 'darwin' | 'linux' {
   throw new JeanClaudeError(
     `Unsupported platform: ${platform}`,
     ErrorCode.UNSUPPORTED_PLATFORM,
-    'Jean-Claude supports macOS and Linux only.'
+    'Agent Config Backup supports macOS and Linux only.'
   );
 }
 
 export function getJeanClaudeDir(): string {
-  return path.join(detectClaudeConfigDir(), '.jean-claude');
+  return path.join(os.homedir(), '.agent-config-backup');
 }
 
 export function detectClaudeConfigDir(): string {
@@ -41,10 +41,15 @@ export function detectClaudeConfigDir(): string {
   return primaryPath;
 }
 
+export function detectCodexConfigDir(): string {
+  return path.join(os.homedir(), '.codex');
+}
+
 export function getConfigPaths(): ConfigPaths {
   return {
     jeanClaudeDir: getJeanClaudeDir(),
     claudeConfigDir: detectClaudeConfigDir(),
+    codexConfigDir: detectCodexConfigDir(),
     platform: detectPlatform(),
   };
 }

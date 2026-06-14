@@ -162,7 +162,7 @@ export async function commitAndPush(
               throw new JeanClaudeError(
                 `Rebase failed due to conflicts: ${errMsg}`,
                 ErrorCode.MERGE_CONFLICT,
-                'Try running "jean-claude sync pull" to resolve conflicts.'
+                'Try running "agent-config sync pull" to resolve conflicts.'
               );
             }
           } else if (errMsg.includes('no such ref') || errMsg.includes("Couldn't find remote ref")) {

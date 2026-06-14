@@ -11,6 +11,9 @@ import {
   updateLastSync,
   syncFromClaudeConfig,
   syncToClaudeConfig,
+  syncAllFromConfigs,
+  syncAllToConfigs,
+  createSyncTargets,
 } from '../../../src/lib/sync.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -78,7 +81,8 @@ describe('sync.ts', () => {
     describe('createMetaJson', () => {
       it('should create valid metadata', () => {
         const claudeConfigPath = '/home/user/.claude';
-        const meta = createMetaJson(claudeConfigPath);
+        const codexConfigPath = '/home/user/.codex';
+        const meta = createMetaJson(claudeConfigPath, codexConfigPath);
 
         expect(meta).toHaveProperty('version');
         expect(meta).toHaveProperty('lastSync');
@@ -86,9 +90,10 @@ describe('sync.ts', () => {
         expect(meta).toHaveProperty('platform');
         expect(meta).toHaveProperty('claudeConfigPath');
 
-        expect(meta.version).toBe('1.1.0');
+        expect(meta.version).toBe('2.1.0');
         expect(meta.lastSync).toBeNull();
         expect(meta.claudeConfigPath).toBe(claudeConfigPath);
+        expect(meta.codexConfigPath).toBe(codexConfigPath);
         expect(meta.machineId).toContain('-'); // Format: hostname-hash
         expect(['linux', 'darwin']).toContain(meta.platform);
       });
@@ -101,18 +106,18 @@ describe('sync.ts', () => {
         expect(meta1.machineId).toBe(meta2.machineId);
       });
 
-      it('should include managedBy field set to jean-claude', () => {
+      it('should include managedBy field set to agent-config-backup', () => {
         const meta = createMetaJson('/test/path');
 
         expect(meta).toHaveProperty('managedBy');
-        expect(meta.managedBy).toBe('jean-claude');
+        expect(meta.managedBy).toBe('agent-config-backup');
       });
     });
 
     describe('writeMetaJson and readMetaJson', () => {
       it('should write and read metadata correctly', async () => {
         const meta = createMetaJson('/test/path');
-        const jeanClaudeDir = path.join(tempDir, '.jean-claude');
+        const jeanClaudeDir = path.join(tempDir, '.agent-config-backup');
         await fs.ensureDir(jeanClaudeDir);
 
         await writeMetaJson(jeanClaudeDir, meta);
@@ -125,7 +130,7 @@ describe('sync.ts', () => {
       });
 
       it('should return null when meta.json does not exist', async () => {
-        const jeanClaudeDir = path.join(tempDir, '.jean-claude');
+        const jeanClaudeDir = path.join(tempDir, '.agent-config-backup');
         await fs.ensureDir(jeanClaudeDir);
 
         const meta = await readMetaJson(jeanClaudeDir);
@@ -136,7 +141,7 @@ describe('sync.ts', () => {
     describe('updateLastSync', () => {
       it('should update the lastSync timestamp', async () => {
         const meta = createMetaJson('/test/path');
-        const jeanClaudeDir = path.join(tempDir, '.jean-claude');
+        const jeanClaudeDir = path.join(tempDir, '.agent-config-backup');
         await fs.ensureDir(jeanClaudeDir);
         await writeMetaJson(jeanClaudeDir, meta);
 
@@ -156,7 +161,7 @@ describe('sync.ts', () => {
   describe('syncFromClaudeConfig', () => {
     it('should copy files from Claude config to jean-claude repo', async () => {
       const claudeDir = path.join(tempDir, '.claude');
-      const jeanClaudeDir = path.join(tempDir, '.jean-claude');
+      const jeanClaudeDir = path.join(tempDir, '.agent-config-backup');
 
       await fs.ensureDir(claudeDir);
       await fs.ensureDir(jeanClaudeDir);
@@ -178,7 +183,7 @@ describe('sync.ts', () => {
 
     it('should copy statusline.sh from Claude config', async () => {
       const claudeDir = path.join(tempDir, '.claude');
-      const jeanClaudeDir = path.join(tempDir, '.jean-claude');
+      const jeanClaudeDir = path.join(tempDir, '.agent-config-backup');
 
       await fs.ensureDir(claudeDir);
       await fs.ensureDir(jeanClaudeDir);
@@ -197,7 +202,7 @@ describe('sync.ts', () => {
 
     it('should sync hooks directory', async () => {
       const claudeDir = path.join(tempDir, '.claude');
-      const jeanClaudeDir = path.join(tempDir, '.jean-claude');
+      const jeanClaudeDir = path.join(tempDir, '.agent-config-backup');
 
       await fs.ensureDir(path.join(claudeDir, 'hooks'));
       await fs.ensureDir(jeanClaudeDir);
@@ -213,7 +218,7 @@ describe('sync.ts', () => {
   describe('syncToClaudeConfig', () => {
     it('should copy files from jean-claude repo to Claude config', async () => {
       const claudeDir = path.join(tempDir, '.claude');
-      const jeanClaudeDir = path.join(tempDir, '.jean-claude');
+      const jeanClaudeDir = path.join(tempDir, '.agent-config-backup');
 
       await fs.ensureDir(claudeDir);
       await fs.ensureDir(jeanClaudeDir);
@@ -232,7 +237,7 @@ describe('sync.ts', () => {
 
     it('should copy statusline.sh to Claude config', async () => {
       const claudeDir = path.join(tempDir, '.claude');
-      const jeanClaudeDir = path.join(tempDir, '.jean-claude');
+      const jeanClaudeDir = path.join(tempDir, '.agent-config-backup');
 
       await fs.ensureDir(claudeDir);
       await fs.ensureDir(jeanClaudeDir);
@@ -251,7 +256,7 @@ describe('sync.ts', () => {
 
     it('should overwrite existing files', async () => {
       const claudeDir = path.join(tempDir, '.claude');
-      const jeanClaudeDir = path.join(tempDir, '.jean-claude');
+      const jeanClaudeDir = path.join(tempDir, '.agent-config-backup');
 
       await fs.ensureDir(claudeDir);
       await fs.ensureDir(jeanClaudeDir);
@@ -263,6 +268,74 @@ describe('sync.ts', () => {
 
       const claudeMd = await fs.readFile(path.join(claudeDir, 'CLAUDE.md'), 'utf-8');
       expect(claudeMd).toBe('# New');
+    });
+  });
+
+  describe('Codex sync support', () => {
+    it('should copy Codex config into codex/ in the sync repo', async () => {
+      const claudeDir = path.join(tempDir, '.claude');
+      const codexDir = path.join(tempDir, '.codex');
+      const syncDir = path.join(tempDir, '.agent-config-backup');
+
+      await fs.ensureDir(claudeDir);
+      await fs.ensureDir(path.join(codexDir, 'skills', 'example'));
+      await fs.ensureDir(path.join(codexDir, 'rules'));
+      await fs.ensureDir(syncDir);
+
+      await fs.writeFile(path.join(codexDir, 'AGENTS.md'), '# Codex instructions');
+      await fs.writeFile(path.join(codexDir, 'config.toml'), 'model = "gpt-5"');
+      await fs.writeFile(path.join(codexDir, 'skills', 'example', 'SKILL.md'), '# Skill');
+      await fs.writeFile(path.join(codexDir, 'rules', 'default.rules'), 'rule');
+      await fs.writeFile(path.join(codexDir, 'auth.json'), '{"token":"secret"}');
+
+      const results = await syncAllFromConfigs(
+        syncDir,
+        createSyncTargets(claudeDir, codexDir)
+      );
+
+      expect(results.some(r => r.file === 'codex/AGENTS.md')).toBe(true);
+      expect(await fs.pathExists(path.join(syncDir, 'codex', 'AGENTS.md'))).toBe(true);
+      expect(await fs.pathExists(path.join(syncDir, 'codex', 'config.toml'))).toBe(true);
+      expect(await fs.pathExists(path.join(syncDir, 'codex', 'skills', 'example', 'SKILL.md'))).toBe(true);
+      expect(await fs.pathExists(path.join(syncDir, 'codex', 'rules', 'default.rules'))).toBe(true);
+      expect(await fs.pathExists(path.join(syncDir, 'codex', 'auth.json'))).toBe(false);
+    });
+
+    it('should apply codex/ files back to ~/.codex', async () => {
+      const claudeDir = path.join(tempDir, '.claude');
+      const codexDir = path.join(tempDir, '.codex');
+      const syncDir = path.join(tempDir, '.agent-config-backup');
+
+      await fs.ensureDir(claudeDir);
+      await fs.ensureDir(path.join(syncDir, 'codex', 'skills', 'example'));
+      await fs.writeFile(path.join(syncDir, 'codex', 'AGENTS.md'), '# Remote Codex');
+      await fs.writeFile(path.join(syncDir, 'codex', 'skills', 'example', 'SKILL.md'), '# Remote Skill');
+
+      const results = await syncAllToConfigs(
+        syncDir,
+        createSyncTargets(claudeDir, codexDir)
+      );
+
+      expect(results.some(r => r.file === 'codex/AGENTS.md')).toBe(true);
+      expect(await fs.readFile(path.join(codexDir, 'AGENTS.md'), 'utf-8')).toBe('# Remote Codex');
+      expect(await fs.readFile(path.join(codexDir, 'skills', 'example', 'SKILL.md'), 'utf-8')).toBe('# Remote Skill');
+    });
+
+    it('should not delete backed-up Codex files when ~/.codex is absent on push', async () => {
+      const claudeDir = path.join(tempDir, '.claude');
+      const codexDir = path.join(tempDir, '.codex');
+      const syncDir = path.join(tempDir, '.agent-config-backup');
+
+      await fs.ensureDir(claudeDir);
+      await fs.ensureDir(path.join(syncDir, 'codex'));
+      await fs.writeFile(path.join(syncDir, 'codex', 'AGENTS.md'), '# Existing Codex backup');
+
+      await syncAllFromConfigs(
+        syncDir,
+        createSyncTargets(claudeDir, codexDir)
+      );
+
+      expect(await fs.readFile(path.join(syncDir, 'codex', 'AGENTS.md'), 'utf-8')).toBe('# Existing Codex backup');
     });
   });
 });

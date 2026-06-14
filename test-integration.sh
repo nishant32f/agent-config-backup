@@ -140,7 +140,7 @@ setup_test_environment() {
         git init > /dev/null 2>&1
         git config user.email "test@example.com"
         git config user.name "Test User"
-        echo '{"version":"1.1.0","managedBy":"jean-claude","lastSync":null,"machineId":"test-setup","platform":"linux","claudeConfigPath":"/test"}' > meta.json
+        echo '{"version":"1.1.0","managedBy":"agent-config-backup","lastSync":null,"machineId":"test-setup","platform":"linux","claudeConfigPath":"/test"}' > meta.json
         git add meta.json
         git commit -m "Initial commit" > /dev/null 2>&1
     )
@@ -188,14 +188,14 @@ test_init_new_repo() {
     # Initialize with --sync and --url flags (non-interactive)
     run_jean_claude "$MACHINE1_DIR" init --sync --url "$REMOTE_REPO"
 
-    assert_dir_exists "$MACHINE1_DIR/.claude/.jean-claude"
-    assert_dir_exists "$MACHINE1_DIR/.claude/.jean-claude/.git"
-    assert_file_exists "$MACHINE1_DIR/.claude/.jean-claude/meta.json"
+    assert_dir_exists "$MACHINE1_DIR/.agent-config-backup"
+    assert_dir_exists "$MACHINE1_DIR/.agent-config-backup/.git"
+    assert_file_exists "$MACHINE1_DIR/.agent-config-backup/meta.json"
 
     # Check meta.json contains valid data
-    assert_file_contains "$MACHINE1_DIR/.claude/.jean-claude/meta.json" "machineId"
-    assert_file_contains "$MACHINE1_DIR/.claude/.jean-claude/meta.json" "version"
-    assert_file_contains "$MACHINE1_DIR/.claude/.jean-claude/meta.json" "platform"
+    assert_file_contains "$MACHINE1_DIR/.agent-config-backup/meta.json" "machineId"
+    assert_file_contains "$MACHINE1_DIR/.agent-config-backup/meta.json" "version"
+    assert_file_contains "$MACHINE1_DIR/.agent-config-backup/meta.json" "platform"
 }
 
 test_init_already_initialized() {
@@ -215,8 +215,8 @@ test_init_with_existing_repo() {
     # Machine 2 should clone the existing repo created by machine 1
     run_jean_claude "$MACHINE2_DIR" init --sync --url "$REMOTE_REPO"
 
-    assert_dir_exists "$MACHINE2_DIR/.claude/.jean-claude"
-    assert_file_exists "$MACHINE2_DIR/.claude/.jean-claude/meta.json"
+    assert_dir_exists "$MACHINE2_DIR/.agent-config-backup"
+    assert_file_exists "$MACHINE2_DIR/.agent-config-backup/meta.json"
 }
 
 test_init_invalid_remote() {
@@ -248,12 +248,12 @@ test_push_initial_files() {
     run_jean_claude "$MACHINE1_DIR" sync push
 
     # Verify files are in the jean-claude repo
-    assert_file_exists "$MACHINE1_DIR/.claude/.jean-claude/CLAUDE.md"
-    assert_file_exists "$MACHINE1_DIR/.claude/.jean-claude/settings.json"
-    assert_file_exists "$MACHINE1_DIR/.claude/.jean-claude/hooks/test-hook.sh"
+    assert_file_exists "$MACHINE1_DIR/.agent-config-backup/CLAUDE.md"
+    assert_file_exists "$MACHINE1_DIR/.agent-config-backup/settings.json"
+    assert_file_exists "$MACHINE1_DIR/.agent-config-backup/hooks/test-hook.sh"
 
     # Verify commit was made
-    cd "$MACHINE1_DIR/.claude/.jean-claude"
+    cd "$MACHINE1_DIR/.agent-config-backup"
     if git log --oneline | grep -q "Update from"; then
         print_success "Commit created with correct message"
     else
@@ -283,7 +283,7 @@ test_push_modified_files() {
     run_jean_claude "$MACHINE1_DIR" sync push
 
     # Verify the change is in the repo
-    if grep -q "Updated Custom Instructions" "$MACHINE1_DIR/.claude/.jean-claude/CLAUDE.md"; then
+    if grep -q "Updated Custom Instructions" "$MACHINE1_DIR/.agent-config-backup/CLAUDE.md"; then
         print_success "Modified file pushed successfully"
     else
         print_failure "Modified file not pushed"
@@ -299,7 +299,7 @@ test_push_new_hook() {
 
     run_jean_claude "$MACHINE1_DIR" sync push
 
-    assert_file_exists "$MACHINE1_DIR/.claude/.jean-claude/hooks/new-hook.sh"
+    assert_file_exists "$MACHINE1_DIR/.agent-config-backup/hooks/new-hook.sh"
 }
 
 # Test pull command
@@ -430,13 +430,13 @@ test_three_machine_init() {
     # Machine 3 initializes from the same remote
     run_jean_claude "$MACHINE3_DIR" init --sync --url "$REMOTE_REPO"
 
-    assert_dir_exists "$MACHINE3_DIR/.claude/.jean-claude"
-    assert_file_exists "$MACHINE3_DIR/.claude/.jean-claude/meta.json"
+    assert_dir_exists "$MACHINE3_DIR/.agent-config-backup"
+    assert_file_exists "$MACHINE3_DIR/.agent-config-backup/meta.json"
 
     # Verify machine 3 has a machine ID (it may be the same as others when
     # running tests on a single physical machine, since IDs are based on hostname)
     # Use grep -E to handle pretty-printed JSON with spaces
-    machine3_id=$(grep -oE '"machineId"[[:space:]]*:[[:space:]]*"[^"]*"' "$MACHINE3_DIR/.claude/.jean-claude/meta.json" | sed 's/.*: *"//' | sed 's/"$//')
+    machine3_id=$(grep -oE '"machineId"[[:space:]]*:[[:space:]]*"[^"]*"' "$MACHINE3_DIR/.agent-config-backup/meta.json" | sed 's/.*: *"//' | sed 's/"$//')
 
     if [ -n "$machine3_id" ]; then
         print_success "Machine 3 has a valid machine ID"
@@ -876,8 +876,8 @@ test_git_status_ahead() {
     print_test "git status when ahead of remote"
 
     # Make a commit without pushing to remote
-    echo "# New content" > "$MACHINE1_DIR/.claude/.jean-claude/CLAUDE.md"
-    cd "$MACHINE1_DIR/.claude/.jean-claude"
+    echo "# New content" > "$MACHINE1_DIR/.agent-config-backup/CLAUDE.md"
+    cd "$MACHINE1_DIR/.agent-config-backup"
     git add .
     git commit -m "Test commit" > /dev/null 2>&1 || true
     cd - > /dev/null
@@ -919,14 +919,14 @@ test_metadata_persistence() {
     print_test "metadata persistence across commands"
 
     # Get initial metadata
-    initial_id=$(grep -o '"machineId":"[^"]*"' "$MACHINE1_DIR/.claude/.jean-claude/meta.json" | cut -d'"' -f4)
+    initial_id=$(grep -o '"machineId":"[^"]*"' "$MACHINE1_DIR/.agent-config-backup/meta.json" | cut -d'"' -f4)
 
     # Run some commands
     run_jean_claude "$MACHINE1_DIR" sync push
     run_jean_claude "$MACHINE1_DIR" sync pull --force
 
     # Check metadata is still the same
-    current_id=$(grep -o '"machineId":"[^"]*"' "$MACHINE1_DIR/.claude/.jean-claude/meta.json" | cut -d'"' -f4)
+    current_id=$(grep -o '"machineId":"[^"]*"' "$MACHINE1_DIR/.agent-config-backup/meta.json" | cut -d'"' -f4)
 
     if [ "$initial_id" = "$current_id" ]; then
         print_success "Machine ID persisted correctly"
@@ -939,7 +939,7 @@ test_last_sync_timestamp() {
     print_test "last sync timestamp updates"
 
     # Check initial timestamp
-    initial_sync=$(grep -o '"lastSync":"[^"]*"' "$MACHINE1_DIR/.claude/.jean-claude/meta.json" | cut -d'"' -f4 || echo "null")
+    initial_sync=$(grep -o '"lastSync":"[^"]*"' "$MACHINE1_DIR/.agent-config-backup/meta.json" | cut -d'"' -f4 || echo "null")
 
     # Sleep briefly
     sleep 1
@@ -948,7 +948,7 @@ test_last_sync_timestamp() {
     run_jean_claude "$MACHINE1_DIR" sync pull --force
 
     # Check updated timestamp
-    updated_sync=$(grep -o '"lastSync":"[^"]*"' "$MACHINE1_DIR/.claude/.jean-claude/meta.json" | cut -d'"' -f4)
+    updated_sync=$(grep -o '"lastSync":"[^"]*"' "$MACHINE1_DIR/.agent-config-backup/meta.json" | cut -d'"' -f4)
 
     if [ "$initial_sync" != "$updated_sync" ]; then
         print_success "Last sync timestamp updated"
@@ -971,8 +971,8 @@ test_profile_create() {
     assert_file_exists "$MACHINE1_DIR/.claude-work/CLAUDE.md"
 
     # Verify profiles.json was created in jean-claude repo
-    assert_file_exists "$MACHINE1_DIR/.claude/.jean-claude/profiles.json"
-    assert_file_contains "$MACHINE1_DIR/.claude/.jean-claude/profiles.json" "work"
+    assert_file_exists "$MACHINE1_DIR/.agent-config-backup/profiles.json"
+    assert_file_contains "$MACHINE1_DIR/.agent-config-backup/profiles.json" "work"
 }
 
 test_profile_symlinks() {
@@ -1176,7 +1176,7 @@ test_profile_shell_alias() {
 
     # Verify alias was added to .zshrc
     assert_file_exists "$MACHINE1_DIR/.zshrc"
-    assert_file_contains "$MACHINE1_DIR/.zshrc" "jean-claude profile: work"
+    assert_file_contains "$MACHINE1_DIR/.zshrc" "agent-config profile: work"
     assert_file_contains "$MACHINE1_DIR/.zshrc" "claude-work"
     assert_file_contains "$MACHINE1_DIR/.zshrc" "CLAUDE_CONFIG_DIR"
 }
@@ -1201,12 +1201,12 @@ test_profile_create_second() {
     assert_dir_exists "$MACHINE1_DIR/.claude-personal"
     assert_file_exists "$MACHINE1_DIR/.claude-personal/CLAUDE.md"
     assert_file_exists "$MACHINE1_DIR/.bashrc"
-    assert_file_contains "$MACHINE1_DIR/.bashrc" "jean-claude profile: personal"
+    assert_file_contains "$MACHINE1_DIR/.bashrc" "agent-config profile: personal"
     assert_file_contains "$MACHINE1_DIR/.bashrc" "claude-personal"
 
     # Verify profiles.json has both profiles
-    assert_file_contains "$MACHINE1_DIR/.claude/.jean-claude/profiles.json" "work"
-    assert_file_contains "$MACHINE1_DIR/.claude/.jean-claude/profiles.json" "personal"
+    assert_file_contains "$MACHINE1_DIR/.agent-config-backup/profiles.json" "work"
+    assert_file_contains "$MACHINE1_DIR/.agent-config-backup/profiles.json" "personal"
 }
 
 test_profile_create_duplicate() {
@@ -1272,14 +1272,14 @@ test_profile_delete() {
     fi
 
     # Verify removed from profiles.json
-    if grep -q "personal" "$MACHINE1_DIR/.claude/.jean-claude/profiles.json"; then
+    if grep -q "personal" "$MACHINE1_DIR/.agent-config-backup/profiles.json"; then
         print_failure "Profile should have been removed from profiles.json"
     else
         print_success "Profile removed from profiles.json"
     fi
 
     # Verify alias removed from .bashrc
-    if grep -q "jean-claude profile: personal" "$MACHINE1_DIR/.bashrc"; then
+    if grep -q "agent-config profile: personal" "$MACHINE1_DIR/.bashrc"; then
         print_failure "Alias should have been removed from .bashrc"
     else
         print_success "Alias removed from .bashrc"
@@ -1287,7 +1287,7 @@ test_profile_delete() {
 
     # Verify work profile still exists
     assert_dir_exists "$MACHINE1_DIR/.claude-work"
-    assert_file_contains "$MACHINE1_DIR/.claude/.jean-claude/profiles.json" "work"
+    assert_file_contains "$MACHINE1_DIR/.agent-config-backup/profiles.json" "work"
 }
 
 test_profile_delete_preserves_main() {
@@ -1326,11 +1326,11 @@ test_init_no_sync() {
     run_jean_claude "$NOSYNC_DIR" init --no-sync
 
     # Should create jean-claude dir and meta.json
-    assert_dir_exists "$NOSYNC_DIR/.claude/.jean-claude"
-    assert_file_exists "$NOSYNC_DIR/.claude/.jean-claude/meta.json"
+    assert_dir_exists "$NOSYNC_DIR/.agent-config-backup"
+    assert_file_exists "$NOSYNC_DIR/.agent-config-backup/meta.json"
 
     # Should NOT have a .git directory
-    if [ -d "$NOSYNC_DIR/.claude/.jean-claude/.git" ]; then
+    if [ -d "$NOSYNC_DIR/.agent-config-backup/.git" ]; then
         print_failure ".git directory should not exist with --no-sync"
     else
         print_success "No .git directory created with --no-sync"
@@ -1347,8 +1347,8 @@ test_init_url_implies_sync() {
     run_jean_claude "$URL_DIR" init --url "$REMOTE_REPO"
 
     # Should have set up git repo with remote
-    assert_dir_exists "$URL_DIR/.claude/.jean-claude/.git"
-    assert_file_exists "$URL_DIR/.claude/.jean-claude/meta.json"
+    assert_dir_exists "$URL_DIR/.agent-config-backup/.git"
+    assert_file_exists "$URL_DIR/.agent-config-backup/meta.json"
 }
 
 # Test two-phase flow: init --no-sync then sync setup --url
@@ -1361,14 +1361,14 @@ test_two_phase_init_then_sync_setup() {
     # Phase 1: init without sync
     run_jean_claude "$TWOPHASE_DIR" init --no-sync
 
-    assert_dir_exists "$TWOPHASE_DIR/.claude/.jean-claude"
-    assert_file_exists "$TWOPHASE_DIR/.claude/.jean-claude/meta.json"
+    assert_dir_exists "$TWOPHASE_DIR/.agent-config-backup"
+    assert_file_exists "$TWOPHASE_DIR/.agent-config-backup/meta.json"
 
     # Phase 2: set up sync
     run_jean_claude "$TWOPHASE_DIR" sync setup --url "$REMOTE_REPO"
 
     # Should now have a git repo
-    assert_dir_exists "$TWOPHASE_DIR/.claude/.jean-claude/.git"
+    assert_dir_exists "$TWOPHASE_DIR/.agent-config-backup/.git"
 
     # Should be able to pull
     run_jean_claude "$TWOPHASE_DIR" sync pull --force
@@ -1407,7 +1407,7 @@ test_sync_setup_reconfigure_url() {
         git init > /dev/null 2>&1
         git config user.email "test@example.com"
         git config user.name "Test User"
-        echo '{"version":"1.1.0","managedBy":"jean-claude","lastSync":null,"machineId":"test","platform":"linux","claudeConfigPath":"/test"}' > meta.json
+        echo '{"version":"1.1.0","managedBy":"agent-config-backup","lastSync":null,"machineId":"test","platform":"linux","claudeConfigPath":"/test"}' > meta.json
         git add meta.json
         git commit -m "Initial commit" > /dev/null 2>&1
     )
@@ -1506,8 +1506,8 @@ KEYBINDINGS
 
     run_jean_claude "$MACHINE1_DIR" sync push
 
-    assert_file_exists "$MACHINE1_DIR/.claude/.jean-claude/keybindings.json"
-    assert_file_contains "$MACHINE1_DIR/.claude/.jean-claude/keybindings.json" "ctrl+enter"
+    assert_file_exists "$MACHINE1_DIR/.agent-config-backup/keybindings.json"
+    assert_file_contains "$MACHINE1_DIR/.agent-config-backup/keybindings.json" "ctrl+enter"
 
     run_jean_claude "$MACHINE2_DIR" sync pull --force
 
@@ -1550,7 +1550,7 @@ test_statusline_sync() {
 
     run_jean_claude "$MACHINE1_DIR" sync push
 
-    assert_file_exists "$MACHINE1_DIR/.claude/.jean-claude/statusline.sh"
+    assert_file_exists "$MACHINE1_DIR/.agent-config-backup/statusline.sh"
 
     run_jean_claude "$MACHINE2_DIR" sync pull --force
 
@@ -1573,8 +1573,8 @@ test_agents_direct_sync() {
 
     run_jean_claude "$MACHINE1_DIR" sync push
 
-    assert_file_exists "$MACHINE1_DIR/.claude/.jean-claude/agents/code-reviewer.md"
-    assert_file_exists "$MACHINE1_DIR/.claude/.jean-claude/agents/refactorer.md"
+    assert_file_exists "$MACHINE1_DIR/.agent-config-backup/agents/code-reviewer.md"
+    assert_file_exists "$MACHINE1_DIR/.agent-config-backup/agents/refactorer.md"
 
     run_jean_claude "$MACHINE2_DIR" sync pull --force
 
@@ -1608,7 +1608,7 @@ test_agents_nested_sync() {
 test_meta_json_fields() {
     print_test "meta.json contains all required fields"
 
-    local meta_file="$MACHINE1_DIR/.claude/.jean-claude/meta.json"
+    local meta_file="$MACHINE1_DIR/.agent-config-backup/meta.json"
     assert_file_exists "$meta_file"
 
     assert_file_contains "$meta_file" "version"
@@ -1619,12 +1619,12 @@ test_meta_json_fields() {
 }
 
 test_meta_json_managed_by() {
-    print_test "meta.json managedBy field is set to jean-claude"
+    print_test "meta.json managedBy field is set to agent-config-backup"
 
-    local meta_file="$MACHINE1_DIR/.claude/.jean-claude/meta.json"
+    local meta_file="$MACHINE1_DIR/.agent-config-backup/meta.json"
 
-    if grep -q '"managedBy"' "$meta_file" && grep -q '"jean-claude"' "$meta_file"; then
-        print_success "managedBy field is set to 'jean-claude'"
+    if grep -q '"managedBy"' "$meta_file" && grep -q '"agent-config-backup"' "$meta_file"; then
+        print_success "managedBy field is set to 'agent-config-backup'"
     else
         print_failure "managedBy field is not set correctly"
     fi
@@ -1633,7 +1633,7 @@ test_meta_json_managed_by() {
 test_meta_json_persists_across_push_pull() {
     print_test "meta.json persists across push and pull cycles"
 
-    local meta_file="$MACHINE1_DIR/.claude/.jean-claude/meta.json"
+    local meta_file="$MACHINE1_DIR/.agent-config-backup/meta.json"
     local initial_machine_id
     initial_machine_id=$(grep -oE '"machineId"[[:space:]]*:[[:space:]]*"[^"]*"' "$meta_file" | sed 's/.*: *"//' | sed 's/"$//')
 
@@ -1664,20 +1664,20 @@ test_init_partial_recovery() {
     # First, init normally with sync
     run_jean_claude "$RECOVERY_DIR" init --sync --url "$REMOTE_REPO"
 
-    assert_dir_exists "$RECOVERY_DIR/.claude/.jean-claude/.git"
-    assert_file_exists "$RECOVERY_DIR/.claude/.jean-claude/meta.json"
+    assert_dir_exists "$RECOVERY_DIR/.agent-config-backup/.git"
+    assert_file_exists "$RECOVERY_DIR/.agent-config-backup/meta.json"
 
     # Simulate partial state: delete meta.json but leave .git
-    rm "$RECOVERY_DIR/.claude/.jean-claude/meta.json"
+    rm "$RECOVERY_DIR/.agent-config-backup/meta.json"
 
     # Re-run init — should detect existing .git and reuse it
     output=$(run_jean_claude "$RECOVERY_DIR" init --no-sync 2>&1 || true)
 
     # meta.json should be recreated
-    assert_file_exists "$RECOVERY_DIR/.claude/.jean-claude/meta.json"
+    assert_file_exists "$RECOVERY_DIR/.agent-config-backup/meta.json"
 
     # .git should still be there
-    assert_dir_exists "$RECOVERY_DIR/.claude/.jean-claude/.git"
+    assert_dir_exists "$RECOVERY_DIR/.agent-config-backup/.git"
 
     if echo "$output" | grep -qi "existing Git repository"; then
         print_success "Init detected and reused existing .git repo"
@@ -1698,7 +1698,7 @@ test_sync_push_no_remote() {
 
     # Manually init git without a remote
     (
-        cd "$NOREMOTE_DIR/.claude/.jean-claude"
+        cd "$NOREMOTE_DIR/.agent-config-backup"
         git init > /dev/null 2>&1
         git config user.email "test@example.com"
         git config user.name "Test User"
@@ -1723,12 +1723,12 @@ test_profile_registry_sync() {
     # Machine1 already has a 'work' profile from earlier tests
     run_jean_claude "$MACHINE1_DIR" sync push
 
-    assert_file_exists "$MACHINE1_DIR/.claude/.jean-claude/profiles.json"
+    assert_file_exists "$MACHINE1_DIR/.agent-config-backup/profiles.json"
 
     run_jean_claude "$MACHINE2_DIR" sync pull --force
 
-    if [ -f "$MACHINE2_DIR/.claude/.jean-claude/profiles.json" ]; then
-        if grep -q "work" "$MACHINE2_DIR/.claude/.jean-claude/profiles.json"; then
+    if [ -f "$MACHINE2_DIR/.agent-config-backup/profiles.json" ]; then
+        if grep -q "work" "$MACHINE2_DIR/.agent-config-backup/profiles.json"; then
             print_success "profiles.json synced to machine2 with profile data"
         else
             print_failure "profiles.json synced but missing profile data"
@@ -1774,7 +1774,7 @@ test_profile_create_hyphenated_name() {
 
     assert_dir_exists "$MACHINE1_DIR/.claude-my-project"
     assert_file_exists "$MACHINE1_DIR/.claude-my-project/CLAUDE.md"
-    assert_file_contains "$MACHINE1_DIR/.claude/.jean-claude/profiles.json" "my-project"
+    assert_file_contains "$MACHINE1_DIR/.agent-config-backup/profiles.json" "my-project"
     assert_file_contains "$MACHINE1_DIR/.bashrc" "claude-my-project"
 
     # Clean up
@@ -1892,12 +1892,12 @@ test_init_conflicting_flags() {
     fi
 
     # --url should win: git should be set up
-    assert_dir_exists "$CONFLICT_DIR/.claude/.jean-claude/.git"
+    assert_dir_exists "$CONFLICT_DIR/.agent-config-backup/.git"
 }
 
 # Run all tests
 run_all_tests() {
-    print_header "Jean-Claude Integration Tests"
+    print_header "Agent Config Backup Integration Tests"
 
     setup_test_environment
 

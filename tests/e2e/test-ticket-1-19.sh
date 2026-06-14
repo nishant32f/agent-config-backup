@@ -3,7 +3,7 @@
 # E2E tests for tickets #1 and #19
 #
 # Ticket #1:  Validate repo contains Claude config before syncing
-#             A non-jean-claude repo should be rejected with a warning.
+#             A non-agent-config repo should be rejected with a warning.
 #
 # Ticket #19: sync setup has no way to reconfigure an existing remote
 #             Running `sync setup --url <new>` when a remote already exists
@@ -158,12 +158,12 @@ setup() {
 
     # Build the project
     cd "$(dirname "$0")/../.."
-    print_info "Building jean-claude..."
+    print_info "Building agent-config..."
     npm run build > /dev/null 2>&1
 
     JEAN_CLAUDE_BIN="$(pwd)/dist/index.js"
     if [ ! -f "$JEAN_CLAUDE_BIN" ]; then
-        echo -e "${RED}Error: jean-claude binary not found at $JEAN_CLAUDE_BIN${NC}"
+        echo -e "${RED}Error: agent-config binary not found at $JEAN_CLAUDE_BIN${NC}"
         exit 1
     fi
     print_info "Binary: $JEAN_CLAUDE_BIN"
@@ -174,15 +174,15 @@ setup() {
 # Ticket #1: Validate repo contains Claude config before syncing
 # ===========================================================================
 test_ticket_1_rejects_non_jean_claude_repo() {
-    print_header "Ticket #1 - Reject non-jean-claude repo"
+    print_header "Ticket #1 - Reject non-agent-config repo"
 
-    # --- Part A: non-jean-claude repo should be rejected ---
-    print_test "#1a: init with non-jean-claude repo warns and can be cancelled"
+    # --- Part A: non-agent-config repo should be rejected ---
+    print_test "#1a: init with non-agent-config repo warns and can be cancelled"
 
     local env_dir="$TEST_DIR/ticket1"
     mkdir -p "$env_dir"
 
-    # Create a bare repo with non-jean-claude content
+    # Create a bare repo with non-agent-config content
     local bare_repo="$env_dir/remote.git"
     local temp_repo="$env_dir/temp-init"
     mkdir -p "$temp_repo"
@@ -208,17 +208,17 @@ test_ticket_1_rejects_non_jean_claude_repo() {
     local exit_code=$?
 
     # Assert: warning message about invalid repo
-    assert_output_contains "$output" "does not appear to be a Jean-Claude config repo"
+    assert_output_contains "$output" "does not appear to be a Agent Config Backup repo"
 
-    # Assert: init was cancelled (non-zero exit or no .jean-claude setup)
-    if [ $exit_code -ne 0 ] || [ ! -d "$m1/.claude/.jean-claude/.git" ]; then
+    # Assert: init was cancelled (non-zero exit or no .agent-config-backup setup)
+    if [ $exit_code -ne 0 ] || [ ! -d "$m1/.agent-config-backup/.git" ]; then
         print_success "Init was cancelled as expected (exit=$exit_code)"
     else
         print_failure "Init should have been cancelled but it completed"
     fi
 
-    # --- Part B: valid jean-claude repo should pass validation ---
-    print_test "#1b: init with valid jean-claude repo succeeds without warning"
+    # --- Part B: valid agent-config repo should pass validation ---
+    print_test "#1b: init with valid agent-config repo succeeds without warning"
 
     create_test_env "ticket1_valid" true
     local valid_output
@@ -228,10 +228,10 @@ test_ticket_1_rejects_non_jean_claude_repo() {
     assert_equals "$valid_exit" "0" "Exit code"
 
     # Should NOT contain the warning
-    if echo "$valid_output" | grep -q "does not appear to be a Jean-Claude config repo"; then
+    if echo "$valid_output" | grep -q "does not appear to be a Agent Config Backup repo"; then
         print_failure "Valid repo should not trigger a warning"
     else
-        print_success "No warning for valid jean-claude repo"
+        print_success "No warning for valid agent-config repo"
     fi
 }
 
@@ -246,12 +246,12 @@ test_ticket_19_reconfigure_existing_remote() {
     local env_dir="$TEST_DIR/ticket19"
     mkdir -p "$env_dir"
 
-    # Remote 1 (valid jean-claude repo)
+    # Remote 1 (valid agent-config repo)
     create_test_env "ticket19_r1" true
     local remote1="$TICKET_REMOTE"
     local m1="$TICKET_M1"
 
-    # Remote 2 (another valid jean-claude repo)
+    # Remote 2 (another valid agent-config repo)
     local temp2="$env_dir/temp2"
     mkdir -p "$temp2"
     (
@@ -270,13 +270,13 @@ test_ticket_19_reconfigure_existing_remote() {
     run_jean_claude "$m1" init --sync --url "$remote1"
 
     local current_url
-    current_url=$(git -C "$m1/.claude/.jean-claude" remote get-url origin)
+    current_url=$(git -C "$m1/.agent-config-backup" remote get-url origin)
     assert_equals "$current_url" "$remote1" "Initial remote URL"
 
     run_jean_claude "$m1" sync setup --url "$remote2"
 
     local new_url
-    new_url=$(git -C "$m1/.claude/.jean-claude" remote get-url origin)
+    new_url=$(git -C "$m1/.agent-config-backup" remote get-url origin)
     assert_equals "$new_url" "$remote2" "Updated remote URL"
 }
 

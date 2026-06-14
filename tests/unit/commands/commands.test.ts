@@ -74,7 +74,7 @@ describe('init command behavior (#20, #38)', () => {
   });
 
   it('detects existing .git directory on partial init recovery (#20)', async () => {
-    const jeanClaudeDir = path.join(tempDir, '.jean-claude');
+    const jeanClaudeDir = path.join(tempDir, '.agent-config-backup');
     await fs.ensureDir(jeanClaudeDir);
 
     // Create a .git directory to simulate partial init
@@ -84,6 +84,7 @@ describe('init command behavior (#20, #38)', () => {
     vi.spyOn(paths, 'getConfigPaths').mockReturnValue({
       jeanClaudeDir,
       claudeConfigDir: path.join(tempDir, '.claude'),
+      codexConfigDir: path.join(tempDir, '.codex'),
       platform: 'linux',
     });
     vi.spyOn(paths, 'ensureDir').mockImplementation(() => {});
@@ -106,12 +107,13 @@ describe('init command behavior (#20, #38)', () => {
   });
 
   it('warns when --url and --no-sync are used together (#38)', async () => {
-    const jeanClaudeDir = path.join(tempDir, '.jean-claude');
+    const jeanClaudeDir = path.join(tempDir, '.agent-config-backup');
     await fs.ensureDir(jeanClaudeDir);
 
     vi.spyOn(paths, 'getConfigPaths').mockReturnValue({
       jeanClaudeDir,
       claudeConfigDir: path.join(tempDir, '.claude'),
+      codexConfigDir: path.join(tempDir, '.codex'),
       platform: 'linux',
     });
     vi.spyOn(paths, 'ensureDir').mockImplementation(() => {});

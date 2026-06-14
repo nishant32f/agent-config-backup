@@ -175,16 +175,16 @@ setup() {
     print_info "Created test directory: $TEST_DIR"
 
     # Build jean-claude
-    print_info "Building jean-claude..."
+    print_info "Building agent-config..."
     cd "$(dirname "$0")/../.."
     npm run build > /dev/null 2>&1
 
     JEAN_CLAUDE_BIN="$(pwd)/dist/index.js"
     if [ ! -f "$JEAN_CLAUDE_BIN" ]; then
-        echo -e "${RED}Error: jean-claude binary not found at $JEAN_CLAUDE_BIN${NC}"
+        echo -e "${RED}Error: agent-config binary not found at $JEAN_CLAUDE_BIN${NC}"
         exit 1
     fi
-    print_info "Jean-claude binary: $JEAN_CLAUDE_BIN"
+    print_info "agent-config binary: $JEAN_CLAUDE_BIN"
 
     print_success "Test environment setup complete"
 }
@@ -238,7 +238,7 @@ test_ticket_36_first_push_empty_repo() {
     assert_output_not_contains "$output" "pull --rebase failed"
     assert_output_not_contains "$output" "no tracking information"
 
-    assert_file_exists "$TICKET_M1/.claude/.jean-claude/CLAUDE.md"
+    assert_file_exists "$TICKET_M1/.agent-config-backup/CLAUDE.md"
 
     print_test "Bare repo received commits after push"
     assert_command_success "git --git-dir=\"$TICKET_REMOTE\" log --oneline"
@@ -274,11 +274,11 @@ test_ticket_35_clone_fallback_empty_repo() {
         print_failure "Init command exited with code $exit_code (expected 0)"
     fi
 
-    assert_dir_exists "$TICKET_M1/.claude/.jean-claude/.git"
+    assert_dir_exists "$TICKET_M1/.agent-config-backup/.git"
 
     print_test "Remote origin is correctly configured"
     local remote_url
-    remote_url=$(git -C "$TICKET_M1/.claude/.jean-claude" remote get-url origin 2>&1)
+    remote_url=$(git -C "$TICKET_M1/.agent-config-backup" remote get-url origin 2>&1)
     local remote_exit=$?
     if [ $remote_exit -eq 0 ]; then
         print_success "Remote origin URL: $remote_url"
@@ -293,8 +293,8 @@ test_ticket_35_clone_fallback_empty_repo() {
     fi
 
     print_test "meta.json exists and contains managedBy"
-    assert_file_exists "$TICKET_M1/.claude/.jean-claude/meta.json"
-    assert_file_contains "$TICKET_M1/.claude/.jean-claude/meta.json" "managedBy"
+    assert_file_exists "$TICKET_M1/.agent-config-backup/meta.json"
+    assert_file_contains "$TICKET_M1/.agent-config-backup/meta.json" "managedBy"
 
     print_test "No error messages about remote origin already exists"
     assert_output_not_contains "$output" "remote origin already exists"

@@ -1,185 +1,150 @@
-# JEAN-CLAUDE
+# Agent Config Backup
 
-**A companion for managing Claude Code profiles and syncing configuration across machines**
+**A companion for managing Claude Code profiles and syncing Claude Code plus Codex configuration across machines.**
 
-## Why?
-
-You've spent hours crafting the perfect `CLAUDE.md`. Your hooks are *chef's kiss*. Your settings are dialed in just right.
-
-Then you sit down at another machine and... nothing. Back to square one. Or you need separate configs for your work and personal Claude accounts, but maintaining them is a pain.
-
-**Jean-Claude fixes that.** It manages multiple Claude Code profiles and optionally syncs everything across machines via Git.
+This fork started from Jean-Claude and keeps its Claude profile workflow, but the sync repository is now neutral: `~/.agent-config-backup`.
 
 ## Quick Start
 
 ```bash
-# Install globally
-npm install -g jean-claude
+# Install globally from this fork/package
+npm install -g agent-config-backup
 
-# Initialize Jean-Claude
-jean-claude init
+# Initialize local backup state
+agent-config init
 
-# Create a profile for your work account
-jean-claude profile create work
+# Create a Claude Code profile for your work account
+agent-config profile create work
 
-# Launch Claude Code with your work profile
-claude-work
+# Push Claude and Codex config to Git
+agent-config sync setup
+agent-config sync push
 ```
+
+The legacy `jean-claude` binary is still available as a compatibility alias.
+
+## What Gets Synced?
+
+Claude Code files are stored at the root of the sync repository:
+
+- `CLAUDE.md`
+- `settings.json`
+- `hooks/`
+- `skills/`
+- `agents/`
+- `keybindings.json`
+- `statusline.sh`
+- Profile definitions
+
+Codex files are stored under `codex/` in the sync repository:
+
+- `codex/AGENTS.md` from `~/.codex/AGENTS.md`
+- `codex/config.toml` from `~/.codex/config.toml`
+- `codex/hooks.json` from `~/.codex/hooks.json`
+- `codex/agents/` from `~/.codex/agents/`
+- `codex/skills/` from `~/.codex/skills/`
+- `codex/rules/` from `~/.codex/rules/`
+
+Codex auth, sessions, logs, caches, databases, attachments, browser state, worktrees, and history are intentionally not synced.
 
 ## Profiles
 
-Profiles let you run multiple Claude Code configurations side by side — one for your Teams account at work, another for your personal Max subscription, and so on.
+Profiles let you run multiple Claude Code configurations side by side.
 
 ```bash
-# Create a profile (interactive — prompts for sharing preferences)
-jean-claude profile create work
+# Create a profile interactively
+agent-config profile create work
 
 # Create non-interactively
-jean-claude profile create work --yes --shell .zshrc
+agent-config profile create work --yes --shell .zshrc
 
-# List your profiles
-jean-claude profile list
+# List profiles
+agent-config profile list
 
 # Launch Claude Code with a profile
 claude-work
 
 # Re-create symlinks if something breaks
-jean-claude profile refresh work
+agent-config profile refresh work
 
 # Delete a profile
-jean-claude profile delete work
+agent-config profile delete work
 ```
 
-### How profiles work
+Your main `~/.claude/` stays the source of truth for Claude profile files. Profile directories such as `~/.claude-work/` symlink shared files back to the main Claude config.
 
-Your main `~/.claude/` stays the source of truth. Profile directories (`~/.claude-<name>/`) are lightweight — they symlink back to your shared files:
-
-| Always shared (symlinked) | Optionally shared         | Profile-specific       |
-|---------------------------|---------------------------|------------------------|
-| `settings.json`           | `CLAUDE.md`               | Authentication/session |
-| `hooks/`                  | `statusline.sh`           |                        |
-| `agents/`                 |                            |                        |
-| `skills/`                 |                            |                        |
-| `plugins/`                |                            |                        |
-| `keybindings.json`        |                            |                        |
-
-During profile creation, you're prompted whether to share `CLAUDE.md` and `statusline.sh` or keep them independent per profile. You can also use flags:
-
-```bash
-# Share both
-jean-claude profile create work --share-claude-md --share-statusline
-
-# Keep both independent
-jean-claude profile create work --no-share-claude-md --no-share-statusline
-```
-
-Change a setting or add a hook in your main config, and all profiles see it immediately.
-
-Profiles work independently of syncing — you can use them without setting up Git.
+| Always shared | Optionally shared | Profile-specific |
+| --- | --- | --- |
+| `settings.json` | `CLAUDE.md` | Authentication/session |
+| `hooks/` | `statusline.sh` | |
+| `agents/` | | |
+| `skills/` | | |
+| `plugins/` | | |
+| `keybindings.json` | | |
 
 ## Syncing
 
-Syncing is optional and uses Git to keep your configuration in sync across machines.
-
-### What gets synced?
-
-- `CLAUDE.md` — Your custom instructions
-- `settings.json` — Your preferences
-- `hooks/` — Your automation scripts
-- `skills/` — Your custom skills
-- `agents/` — Your custom agents
-- `keybindings.json` — Your keyboard shortcuts
-- `statusline.sh` — Your statusline configuration
-- Profile definitions — So profiles carry over to other machines
-
-### Commands
+Syncing is optional and uses Git.
 
 ```bash
-# Set up syncing (during init or later)
-jean-claude sync setup
+# Set up syncing
+agent-config sync setup
 
-# Push your config to Git
-jean-claude sync push
+# Push your local Claude and Codex config to Git
+agent-config sync push
 
 # Pull config on another machine
-jean-claude sync pull
+agent-config sync pull
 
 # Check sync status
-jean-claude sync status
+agent-config sync status
 ```
 
-### Typical workflow
+Typical workflow:
 
 ```bash
-# Machine 1: Initialize and push
-jean-claude init
-jean-claude profile create work --yes --shell .zshrc
-jean-claude sync push
+# Machine 1
+agent-config init
+agent-config profile create work --yes --shell .zshrc
+agent-config sync setup
+agent-config sync push
 
-# Machine 2: Initialize, pull, and go
-jean-claude init --sync --url git@github.com:you/claude-config.git
-jean-claude sync pull
-claude-work  # Profile alias is ready
+# Machine 2
+agent-config init --sync --url git@github.com:you/agent-config.git
+agent-config sync pull
+claude-work
 ```
 
 ## Command Reference
 
 | Command | Description |
-|---------|-------------|
-| `jean-claude init` | Initialize Jean-Claude on this machine |
-| `jean-claude init --sync --url <repo>` | Initialize with Git syncing |
-| `jean-claude init --no-sync` | Initialize without syncing |
-| `jean-claude profile create <name>` | Create a new profile |
-| `jean-claude profile list` | List all profiles |
-| `jean-claude profile delete <name>` | Delete a profile |
-| `jean-claude profile refresh <name>` | Refresh profile symlinks |
-| `jean-claude sync setup` | Set up Git-based syncing |
-| `jean-claude sync push` | Push config to Git |
-| `jean-claude sync pull` | Pull config from Git |
-| `jean-claude sync status` | Check sync status |
+| --- | --- |
+| `agent-config init` | Initialize Agent Config Backup on this machine |
+| `agent-config init --sync --url <repo>` | Initialize with Git syncing |
+| `agent-config init --no-sync` | Initialize without syncing |
+| `agent-config profile create <name>` | Create a Claude Code profile |
+| `agent-config profile list` | List profiles |
+| `agent-config profile delete <name>` | Delete a profile |
+| `agent-config profile refresh <name>` | Refresh profile symlinks |
+| `agent-config sync setup` | Set up Git-based syncing |
+| `agent-config sync push` | Push config to Git |
+| `agent-config sync pull` | Pull config from Git |
+| `agent-config sync status` | Check sync status |
 
 ## Development
 
-### Running Tests
+```bash
+npm install
+npm run build
+npm run test:unit
+```
+
+Integration tests are available with:
 
 ```bash
-# Run all tests (unit + integration)
-npm test
-
-# Run only unit tests (fast)
-npm run test:unit
-
-# Run unit tests in watch mode
-npm run test:unit:watch
-
-# Run with coverage report
-npm run test:coverage
-
-# Run only integration tests
 npm run test:integration
 ```
 
-#### Unit Tests
+## Security Notes
 
-Fast, isolated tests for core logic:
-- Profile creation, symlinks, and duplicate prevention
-- File sync and metadata operations
-- Error handling and types
-- Utility functions
-
-#### Integration Tests
-
-End-to-end tests that simulate real usage with local git repositories and multiple machines:
-- **init**: New repos, existing repos, partial recovery, flag combinations
-- **profiles**: Create, list, delete, refresh, duplicate prevention, shared/independent CLAUDE.md and statusline.sh
-- **sync setup**: Linking to a Git remote, reconfiguration
-- **sync push/pull**: Initial files, modifications, hooks, agents, keybindings, statusline
-- **sync status**: Clean state, uncommitted changes, diverged state
-- **Multi-machine sync**: Bidirectional sync, three-machine convergence
-- **Edge cases**: Empty directories, special characters, large files, concurrent modifications, deprecated command stubs
-
-See [tests/README.md](tests/README.md) for more details.
-
----
-
-*Named after the famous Belgian martial artist and philosopher, because your config deserves to do the splits between profiles and machines.*
+Codex support is intentionally config-focused. It does not back up `~/.codex/auth.json`, session logs, SQLite state, browser sessions, attachments, plugin caches, temporary files, or worktrees.

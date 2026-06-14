@@ -29,13 +29,13 @@ const profileCreateCommand = new Command('create')
   .option('--share-claude-md', 'Share CLAUDE.md with this profile (symlink)')
   .option('--no-share-claude-md', 'Do not share CLAUDE.md with this profile')
   .action(async (nameArg: string | undefined, options: { yes?: boolean; shell?: string; shareStatusline?: boolean; shareClaudeMd?: boolean }) => {
-    // Verify jean-claude is initialized
+    // Verify Agent Config Backup is initialized
     const jcDir = getJeanClaudeDir();
     if (!(await fs.pathExists(jcDir))) {
       throw new JeanClaudeError(
-        'Jean-Claude is not initialized',
+        'Agent Config Backup is not initialized',
         ErrorCode.NOT_INITIALIZED,
-        'Run `jean-claude init` first.'
+        'Run `agent-config init` first.'
       );
     }
 
@@ -59,7 +59,7 @@ const profileCreateCommand = new Command('create')
       throw new JeanClaudeError(
         `Profile "${name}" already exists`,
         ErrorCode.ALREADY_EXISTS,
-        `Use 'jean-claude profile list' to see existing profiles.`
+        `Use 'agent-config profile list' to see existing profiles.`
       );
     }
     if (await fs.pathExists(configDir)) {
@@ -162,7 +162,7 @@ const profileListCommand = new Command('list')
 
     if (names.length === 0) {
       logger.dim('No profiles configured.');
-      logger.dim('Create one with: jean-claude profile create <name>');
+      logger.dim('Create one with: agent-config profile create <name>');
       return;
     }
 

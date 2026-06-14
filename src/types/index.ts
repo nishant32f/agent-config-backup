@@ -25,6 +25,7 @@ export enum ErrorCode {
 export interface ConfigPaths {
   jeanClaudeDir: string;
   claudeConfigDir: string;
+  codexConfigDir: string;
   platform: 'darwin' | 'linux';
 }
 
@@ -41,6 +42,7 @@ export interface MetaJson {
   machineId: string;
   platform: string;
   claudeConfigPath: string;
+  codexConfigPath?: string;
 }
 
 export interface SyncResult {

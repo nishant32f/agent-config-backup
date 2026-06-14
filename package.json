@@ -1,16 +1,17 @@
 {
-  "name": "jean-claude",
-  "version": "2.0.0",
-  "description": "Sync Claude Code configuration across machines using Git",
-  "author": "Mike Veerman",
+  "name": "agent-config-backup",
+  "version": "2.1.0",
+  "description": "Sync Claude Code and Codex configuration across machines using Git",
+  "author": "nishant32f",
   "repository": {
     "type": "git",
-    "url": "https://github.com/MikeVeerman/jean-claude"
+    "url": "https://github.com/nishant32f/agent-config-backup"
   },
-  "homepage": "https://github.com/MikeVeerman/jean-claude#readme",
+  "homepage": "https://github.com/nishant32f/agent-config-backup#readme",
   "type": "module",
   "main": "./dist/index.js",
   "bin": {
+    "agent-config": "./dist/index.js",
     "jean-claude": "./dist/index.js"
   },
   "scripts": {
@@ -28,6 +29,8 @@
   "keywords": [
     "claude",
     "claude-code",
+    "codex",
+    "openai-codex",
     "dotfiles",
     "sync",
     "cli",
@@ -46,7 +49,7 @@
     "commander": "^12.0.0",
     "fs-extra": "^11.2.0",
     "inquirer": "^9.2.0",
-    "simple-git": "^3.22.0"
+    "simple-git": "^3.36.0"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",

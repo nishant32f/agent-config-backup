@@ -149,15 +149,15 @@ setup() {
 
     # Build jean-claude
     cd "$(dirname "$0")/../.."
-    print_info "Building jean-claude..."
+    print_info "Building agent-config..."
     npm run build > /dev/null 2>&1
 
     JEAN_CLAUDE_BIN="$(pwd)/dist/index.js"
     if [ ! -f "$JEAN_CLAUDE_BIN" ]; then
-        echo -e "${RED}Error: jean-claude binary not found at $JEAN_CLAUDE_BIN${NC}"
+        echo -e "${RED}Error: agent-config binary not found at $JEAN_CLAUDE_BIN${NC}"
         exit 1
     fi
-    print_info "Jean-claude binary: $JEAN_CLAUDE_BIN"
+    print_info "agent-config binary: $JEAN_CLAUDE_BIN"
     print_success "Test environment setup complete"
 }
 
@@ -170,14 +170,14 @@ test_ticket_31_sync_setup_url_flag_noninteractive() {
     create_test_env "ticket31" true
 
     # Step 1: init WITHOUT sync
-    print_test "#31 - init --no-sync creates .jean-claude dir"
+    print_test "#31 - init --no-sync creates .agent-config-backup dir"
     run_jean_claude "$TICKET_M1" init --no-sync > /dev/null 2>&1
-    assert_dir_exists "$TICKET_M1/.claude/.jean-claude"
+    assert_dir_exists "$TICKET_M1/.agent-config-backup"
 
     # Step 2: verify no git remote configured
     print_test "#31 - no git remote after init --no-sync"
     local remotes
-    remotes=$(git -C "$TICKET_M1/.claude/.jean-claude" remote 2>&1 || true)
+    remotes=$(git -C "$TICKET_M1/.agent-config-backup" remote 2>&1 || true)
     if [ -z "$remotes" ]; then
         print_success "No git remotes configured after init --no-sync"
     else
@@ -200,7 +200,7 @@ test_ticket_31_sync_setup_url_flag_noninteractive() {
     # Assert remote is now set to the bare repo path
     print_test "#31 - remote origin points to bare repo after sync setup --url"
     local remote_url
-    remote_url=$(git -C "$TICKET_M1/.claude/.jean-claude" remote get-url origin 2>&1)
+    remote_url=$(git -C "$TICKET_M1/.agent-config-backup" remote get-url origin 2>&1)
     if [ "$remote_url" = "$TICKET_REMOTE" ]; then
         print_success "Remote origin URL matches: $remote_url"
     else
@@ -227,11 +227,11 @@ test_ticket_16_statusline_sync() {
     # Step 1: init both machines with sync
     print_test "#16 - init machine 1 with sync"
     run_jean_claude "$TICKET_M1" init --sync --url "$TICKET_REMOTE" > /dev/null 2>&1
-    assert_dir_exists "$TICKET_M1/.claude/.jean-claude"
+    assert_dir_exists "$TICKET_M1/.agent-config-backup"
 
     print_test "#16 - init machine 2 with sync"
     run_jean_claude "$TICKET_M2" init --sync --url "$TICKET_REMOTE" > /dev/null 2>&1
-    assert_dir_exists "$TICKET_M2/.claude/.jean-claude"
+    assert_dir_exists "$TICKET_M2/.agent-config-backup"
 
     # Step 2: create statusline.sh on machine 1
     print_test "#16 - create statusline.sh on machine 1 and push"
@@ -245,8 +245,8 @@ STATUSLINE
     run_jean_claude "$TICKET_M1" sync push > /dev/null 2>&1
 
     # Step 4: verify statusline.sh is in the jean-claude sync repo
-    assert_file_exists "$TICKET_M1/.claude/.jean-claude/statusline.sh"
-    assert_file_contains "$TICKET_M1/.claude/.jean-claude/statusline.sh" "Custom statusline script"
+    assert_file_exists "$TICKET_M1/.agent-config-backup/statusline.sh"
+    assert_file_contains "$TICKET_M1/.agent-config-backup/statusline.sh" "Custom statusline script"
 
     # Step 5: pull on machine 2
     print_test "#16 - pull statusline.sh on machine 2"

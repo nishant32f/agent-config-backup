@@ -19,12 +19,12 @@ describe('JeanClaudeError', () => {
     const error = new JeanClaudeError(
       'Test error message',
       ErrorCode.NOT_INITIALIZED,
-      'Run jean-claude init first'
+      'Run agent-config init first'
     );
 
     expect(error.message).toBe('Test error message');
     expect(error.code).toBe(ErrorCode.NOT_INITIALIZED);
-    expect(error.suggestion).toBe('Run jean-claude init first');
+    expect(error.suggestion).toBe('Run agent-config init first');
   });
 
   it('should have correct error codes enum', () => {

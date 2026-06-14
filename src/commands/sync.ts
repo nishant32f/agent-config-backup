@@ -5,7 +5,7 @@ import chalk from 'chalk';
 import { logger, formatPath } from '../utils/logger.js';
 import { getConfigPaths } from '../lib/paths.js';
 import { isGitRepo, getGitStatus, commitAndPush, pull, hasMergeConflicts, resetHard, cleanUntracked } from '../lib/git.js';
-import { syncFromClaudeConfig, syncToClaudeConfig, updateLastSync, compareFiles, readMetaJson } from '../lib/sync.js';
+import { syncAllFromConfigs, syncAllToConfigs, updateLastSync, compareAllFiles, readMetaJson, createSyncTargets } from '../lib/sync.js';
 import { setupGitSync } from '../lib/sync-setup.js';
 import { confirm } from '../utils/prompts.js';
 import { JeanClaudeError, ErrorCode } from '../types/index.js';
@@ -24,9 +24,9 @@ const syncSetupCommand = new Command('setup')
 
     if (!fs.existsSync(jeanClaudeDir)) {
       throw new JeanClaudeError(
-        'Jean-Claude is not initialized',
+        'Agent Config Backup is not initialized',
         ErrorCode.NOT_INITIALIZED,
-        'Run "jean-claude init" first.'
+        'Run "agent-config init" first.'
       );
     }
 
@@ -35,20 +35,20 @@ const syncSetupCommand = new Command('setup')
     console.log('');
     logger.dim('Next steps:');
     logger.list([
-      'Run "jean-claude sync push" to push your config to Git',
-      'Run "jean-claude sync pull" on other machines to sync',
+      'Run "agent-config sync push" to push your config to Git',
+      'Run "agent-config sync pull" on other machines to sync',
     ]);
   });
 
 export async function handleSyncPush(): Promise<void> {
-  const { jeanClaudeDir, claudeConfigDir } = getConfigPaths();
+  const { jeanClaudeDir, claudeConfigDir, codexConfigDir } = getConfigPaths();
 
   // Verify initialized
   if (!fs.existsSync(jeanClaudeDir)) {
     throw new JeanClaudeError(
-      'Jean-Claude is not initialized',
+      'Agent Config Backup is not initialized',
       ErrorCode.NOT_INITIALIZED,
-      'Run "jean-claude init" first.'
+      'Run "agent-config init" first.'
     );
   }
 
@@ -56,13 +56,18 @@ export async function handleSyncPush(): Promise<void> {
     throw new JeanClaudeError(
       `${formatPath(jeanClaudeDir)} is not a Git repository`,
       ErrorCode.NOT_GIT_REPO,
-      'Run "jean-claude sync setup" to configure syncing.'
+      'Run "agent-config sync setup" to configure syncing.'
     );
   }
 
-  // Step 1: Copy files from ~/.claude to ~/.jean-claude
-  logger.step(1, 2, `Syncing from ${formatPath(claudeConfigDir)}...`);
-  const syncResults = await syncFromClaudeConfig(claudeConfigDir, jeanClaudeDir);
+  // Step 1: Copy files from local config directories to the sync repo
+  logger.step(1, 2, 'Syncing local agent configs...');
+  logger.dim(`Claude: ${formatPath(claudeConfigDir)}`);
+  logger.dim(`Codex:  ${formatPath(codexConfigDir)}`);
+  const syncResults = await syncAllFromConfigs(
+    jeanClaudeDir,
+    createSyncTargets(claudeConfigDir, codexConfigDir)
+  );
   const synced = syncResults.filter((r) => r.action !== 'skipped');
   if (synced.length > 0) {
     synced.forEach((r) => {
@@ -120,14 +125,14 @@ const syncPushCommand = new Command('push')
   .action(handleSyncPush);
 
 export async function handleSyncPull(options: { force?: boolean } = {}): Promise<void> {
-  const { jeanClaudeDir, claudeConfigDir } = getConfigPaths();
+  const { jeanClaudeDir, claudeConfigDir, codexConfigDir } = getConfigPaths();
 
   // Verify initialized
   if (!fs.existsSync(jeanClaudeDir)) {
     throw new JeanClaudeError(
-      'Jean-Claude is not initialized',
+      'Agent Config Backup is not initialized',
       ErrorCode.NOT_INITIALIZED,
-      'Run "jean-claude init" first.'
+      'Run "agent-config init" first.'
     );
   }
 
@@ -135,7 +140,7 @@ export async function handleSyncPull(options: { force?: boolean } = {}): Promise
     throw new JeanClaudeError(
       `${formatPath(jeanClaudeDir)} is not a Git repository`,
       ErrorCode.NOT_GIT_REPO,
-      'Run "jean-claude sync setup" to configure syncing.'
+      'Run "agent-config sync setup" to configure syncing.'
     );
   }
 
@@ -145,7 +150,7 @@ export async function handleSyncPull(options: { force?: boolean } = {}): Promise
     throw new JeanClaudeError(
       'No remote configured',
       ErrorCode.NO_REMOTE,
-      'Run "jean-claude sync setup" to set up a remote repository.'
+      'Run "agent-config sync setup" to set up a remote repository.'
     );
   }
 
@@ -179,9 +184,14 @@ export async function handleSyncPull(options: { force?: boolean } = {}): Promise
     );
   }
 
-  // Apply to ~/.claude
-  logger.step(2, 2, `Applying to ${formatPath(claudeConfigDir)}...`);
-  const results = await syncToClaudeConfig(jeanClaudeDir, claudeConfigDir);
+  // Apply to local config directories
+  logger.step(2, 2, 'Applying to local agent configs...');
+  logger.dim(`Claude: ${formatPath(claudeConfigDir)}`);
+  logger.dim(`Codex:  ${formatPath(codexConfigDir)}`);
+  const results = await syncAllToConfigs(
+    jeanClaudeDir,
+    createSyncTargets(claudeConfigDir, codexConfigDir)
+  );
   const applied = results.filter((r) => r.action !== 'skipped');
 
   // Update last sync time
@@ -197,34 +207,36 @@ export async function handleSyncPull(options: { force?: boolean } = {}): Promise
 }
 
 const syncPullCommand = new Command('pull')
-  .description('Pull latest config from Git and apply to Claude Code')
+  .description('Pull latest config from Git and apply to Claude Code and Codex')
   .option('--force', 'Skip confirmation when discarding local changes')
   .action((options: { force?: boolean }) => handleSyncPull(options));
 
 export async function handleSyncStatus(): Promise<void> {
-  const { jeanClaudeDir, claudeConfigDir } = getConfigPaths();
+  const { jeanClaudeDir, claudeConfigDir, codexConfigDir } = getConfigPaths();
 
   // Verify initialized
   if (!fs.existsSync(jeanClaudeDir)) {
     throw new JeanClaudeError(
-      'Jean-Claude is not initialized',
+      'Agent Config Backup is not initialized',
       ErrorCode.NOT_INITIALIZED,
-      'Run "jean-claude init" first.'
+      'Run "agent-config init" first.'
     );
   }
 
   const isRepo = await isGitRepo(jeanClaudeDir);
   const gitStatus = isRepo ? await getGitStatus(jeanClaudeDir) : null;
   const meta = await readMetaJson(jeanClaudeDir);
-  const fileComparison = compareFiles(jeanClaudeDir, claudeConfigDir);
+  const targets = createSyncTargets(claudeConfigDir, codexConfigDir);
+  const fileComparison = compareAllFiles(jeanClaudeDir, targets);
 
   // Pretty output
-  logger.heading('Jean-Claude Status');
+  logger.heading('Agent Config Backup Status');
 
   console.log('');
   logger.table([
     ['Repository', formatPath(jeanClaudeDir)],
     ['Claude Config', formatPath(claudeConfigDir)],
+    ['Codex Config', formatPath(codexConfigDir)],
     ['Platform', meta?.platform || 'unknown'],
   ]);
 
@@ -233,7 +245,7 @@ export async function handleSyncStatus(): Promise<void> {
   logger.dim('Git Status');
   if (!isRepo) {
     console.log(`  ${chalk.red('✗')} Not a Git repository`);
-    logger.dim('  Run "jean-claude sync setup" to enable syncing.');
+    logger.dim('  Run "agent-config sync setup" to enable syncing.');
   } else if (gitStatus) {
     console.log(
       `  ${chalk.dim('Branch:')}  ${gitStatus.branch || 'unknown'}`
@@ -280,7 +292,7 @@ export async function handleSyncStatus(): Promise<void> {
     }
 
     console.log(
-      `  ${icon} ${c.mapping.source.padEnd(15)} ${chalk.dim('→')} ${c.mapping.target.padEnd(15)} ${status}`
+      `  ${icon} ${c.targetName.padEnd(6)} ${c.mapping.source.padEnd(24)} ${chalk.dim('→')} ${c.mapping.target.padEnd(15)} ${status}`
     );
   });
 
@@ -296,7 +308,7 @@ const syncStatusCommand = new Command('status')
   .action(handleSyncStatus);
 
 export const syncCommand = new Command('sync')
-  .description('Manage Git-based syncing of your configuration')
+  .description('Manage Git-based syncing of your Claude Code and Codex configuration')
   .addCommand(syncSetupCommand)
   .addCommand(syncPushCommand)
   .addCommand(syncPullCommand)

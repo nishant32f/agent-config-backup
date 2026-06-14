@@ -9,23 +9,23 @@ import { JeanClaudeError, ErrorCode } from '../types/index.js';
 
 async function warnIfNotJeanClaudeRepo(dir: string): Promise<void> {
   const meta = await readMetaJson(dir);
-  if (meta?.managedBy === 'jean-claude') return;
+  if (meta?.managedBy === 'agent-config-backup' || meta?.managedBy === 'jean-claude') return;
 
-  logger.warn('This repository does not appear to be a Jean-Claude config repo.');
-  logger.dim('It may overwrite your Claude Code configuration with unrelated files.');
+  logger.warn('This repository does not appear to be an Agent Config Backup repo.');
+  logger.dim('It may overwrite your Claude Code or Codex configuration with unrelated files.');
   const proceed = await confirm('Continue anyway?', false);
   if (!proceed) {
     throw new JeanClaudeError(
       'Setup cancelled — repository validation failed',
       ErrorCode.INVALID_CONFIG,
-      'Use a repository created by "jean-claude init" with syncing enabled.'
+      'Use a repository created by "agent-config init" with syncing enabled.'
     );
   }
 }
 
 /**
  * Interactive Git remote setup flow.
- * Used by both `jean-claude init` (when user opts in) and `jean-claude sync setup`.
+ * Used by both `agent-config init` (when user opts in) and `agent-config sync setup`.
  */
 export async function setupGitSync(jeanClaudeDir: string, urlArg?: string): Promise<void> {
   const isRepo = await isGitRepo(jeanClaudeDir);
@@ -61,7 +61,7 @@ export async function setupGitSync(jeanClaudeDir: string, urlArg?: string): Prom
     // Explain what's needed
     console.log('');
     logger.dim('Paste the URL of your existing config repo, or create a new');
-    logger.dim('empty repo (e.g. "my-claude-config") on GitHub/GitLab.');
+    logger.dim('empty repo (e.g. "my-agent-config") on GitHub/GitLab.');
     console.log('');
 
     repoUrl = await input('Repository URL:');
@@ -118,7 +118,7 @@ export async function setupGitSync(jeanClaudeDir: string, urlArg?: string): Prom
       }
     } else {
       // Non-empty directory (e.g. has meta.json) — clone to temp, move .git over
-      const tmpDir = path.join(os.tmpdir(), `jean-claude-clone-${Date.now()}`);
+      const tmpDir = path.join(os.tmpdir(), `agent-config-backup-clone-${Date.now()}`);
       try {
         await cloneRepo(repoUrl, tmpDir);
         const tmpGit = createGit(tmpDir);

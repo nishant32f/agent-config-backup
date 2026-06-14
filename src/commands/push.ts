@@ -3,12 +3,12 @@ import chalk from 'chalk';
 import { handleSyncPush } from './sync.js';
 
 const cmd = new Command('push')
-  .description('(deprecated) Use "jean-claude sync push" instead')
+  .description('(deprecated) Use "agent-config sync push" instead')
   .action(async () => {
     console.error(
       chalk.yellow('Warning:') +
-      ' "jean-claude push" is deprecated. Use ' +
-      chalk.cyan('jean-claude sync push') +
+      ' "agent-config push" is deprecated. Use ' +
+      chalk.cyan('agent-config sync push') +
       ' instead.'
     );
     console.error('');

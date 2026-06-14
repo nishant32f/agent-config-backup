@@ -19,8 +19,8 @@ export function createProgram(): Command {
   const program = new Command();
 
   program
-    .name('jean-claude')
-    .description('Manage and sync Claude Code configuration across machines')
+    .name('agent-config')
+    .description('Manage and sync Claude Code and Codex configuration across machines')
     .version(VERSION)
     .addHelpText('before', () => {
       printLogo();

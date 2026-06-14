@@ -1,6 +1,6 @@
-# Jean-Claude Tests
+# Agent Config Backup Tests
 
-This directory contains both unit tests and integration tests for jean-claude.
+This directory contains both unit tests and integration tests for agent-config.
 
 ## Test Structure
 
